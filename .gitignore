@@ -1,0 +1,10 @@
+# Database configuration
+db.php
+
+# Uploaded content
+uploads/*
+!uploads/.gitkeep
+
+# OS generated files
+.DS_Store
+Thumbs.db
