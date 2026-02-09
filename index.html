@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Flipbook</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+
+<body>
+
+    <!-- Header / Controls (Empty - moved to bottom) -->
+
+    <!-- Library Sidebar Removed -->
+
+    <!-- Main Flipbook Container -->
+    <div class="container">
+        <div id="loader" class="loader">Loading PDF...</div>
+        <div id="flipbook">
+            <div class="cover-message">Select a book from the Library</div>
+        </div>
+    </div>
+
+    <!-- Bottom Control Bar -->
+    <div class="bottom-controls">
+        <div class="left-group">
+            <button id="prev-btn" class="nav-btn" title="Previous Page">&lt;</button>
+        </div>
+
+        <div class="center-group">
+            <button id="zoom-out" class="nav-btn" title="Zoom Out">➖</button>
+            <button id="zoom-reset" class="nav-btn" title="Reset Zoom">⟲</button>
+            <button id="zoom-in" class="nav-btn" title="Zoom In">➕</button>
+        </div>
+
+        <div class="right-group">
+            <button id="next-btn" class="nav-btn" title="Next Page">&gt;</button>
+            <div class="menu-container">
+                <button id="menu-btn" class="nav-btn" title="More Options">⋯</button>
+                <div id="menu-dropdown" class="menu-dropdown">
+                    <button id="first-page-btn" class="menu-item">Go to First Page</button>
+                    <button id="last-page-btn" class="menu-item">Go to Last Page</button>
+                    <a id="download-btn" class="menu-item" href="#" download>Download PDF</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Libraries -->
+    <script src="assets/js/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'assets/js/pdf.worker.min.js';
+    </script>
+    <script src="assets/js/page-flip.browser.js"></script>
+
+    <!-- Main Script -->
+    <script src="assets/js/main.js"></script>
+</body>
+
+</html>
