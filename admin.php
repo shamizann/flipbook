@@ -20,7 +20,6 @@ if (isset($_GET['logout'])) {
     <title>Flipbook Admin</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <style>
-        /* Specific Admin Styles */
         body.admin-body {
             display: block;
             background: #f4f4f4;
@@ -30,7 +29,7 @@ if (isset($_GET['logout'])) {
         }
 
         .admin-container {
-            max-width: 800px;
+            max-width: 1040px;
             margin: 0 auto;
             background: white;
             padding: 30px;
@@ -43,20 +42,56 @@ if (isset($_GET['logout'])) {
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
+            gap: 12px;
         }
 
-        h1 {
+        h1,
+        h2 {
             margin: 0;
         }
 
         .upload-section {
             background: #e9ecef;
-            padding: 20px;
+            padding: 16px;
             border-radius: 8px;
-            margin-bottom: 30px;
+            margin-bottom: 16px;
             display: flex;
             gap: 10px;
             align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .list-controls {
+            display: grid;
+            grid-template-columns: minmax(180px, 1fr) auto auto auto;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .list-controls input,
+        .list-controls select {
+            padding: 8px 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            background: #fff;
+        }
+
+        .btn {
+            border: none;
+            border-radius: 6px;
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: #fff;
         }
 
         .book-list-admin .book-item {
@@ -64,8 +99,19 @@ if (isset($_GET['logout'])) {
             border: 1px solid #ddd;
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
             color: #333;
+            padding: 12px 14px;
+            border-radius: 8px 8px 0 0;
+            margin-top: 12px;
+            margin-bottom: 0;
+            cursor: default;
+            gap: 12px;
+        }
+
+        .book-item.trashed {
+            border-color: #d7b0b0;
+            background: #fff9f9;
         }
 
         .book-list-admin .book-item:hover {
@@ -74,7 +120,9 @@ if (isset($_GET['logout'])) {
 
         .actions {
             display: flex;
-            gap: 10px;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
         }
 
         .btn-delete {
@@ -86,19 +134,55 @@ if (isset($_GET['logout'])) {
             cursor: pointer;
         }
 
+        .btn-delete:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
         .btn-view {
             background: #28a745;
             color: white;
             text-decoration: none;
-            padding: 5px 10px;
+            padding: 6px 10px;
             border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .btn-copy {
             background: #17a2b8;
             color: white;
             border: none;
-            padding: 5px 10px;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .btn-replace {
+            background: #f0ad4e;
+            color: #1f1f1f;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .btn-history {
+            background: #495057;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .btn-restore {
+            background: #198754;
+            color: white;
+            border: none;
+            padding: 6px 10px;
             border-radius: 4px;
             cursor: pointer;
         }
@@ -109,10 +193,169 @@ if (isset($_GET['logout'])) {
             text-decoration: none;
             padding: 8px 15px;
             border-radius: 4px;
+            white-space: nowrap;
         }
 
         .btn-logout:hover {
             background: #5a6268;
+        }
+
+        .btn-delete:disabled,
+        .btn-replace:disabled,
+        .btn-restore:disabled,
+        .btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        .status-message {
+            margin-bottom: 12px;
+            padding: 10px 12px;
+            border-radius: 6px;
+            display: none;
+        }
+
+        .status-message.info {
+            display: block;
+            background: #e7f3ff;
+            color: #1f4f8a;
+        }
+
+        .status-message.success {
+            display: block;
+            background: #e9f7ef;
+            color: #1c7430;
+        }
+
+        .status-message.error {
+            display: block;
+            background: #fcebea;
+            color: #a91b1b;
+        }
+
+        .list-summary {
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #525252;
+        }
+
+        .book-title-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            flex-wrap: wrap;
+        }
+
+        .version-pill {
+            background: #343a40;
+            color: #fff;
+            border-radius: 999px;
+            font-size: 12px;
+            padding: 2px 8px;
+        }
+
+        .trash-pill {
+            background: #a91b1b;
+            color: #fff;
+            border-radius: 999px;
+            font-size: 12px;
+            padding: 2px 8px;
+        }
+
+        .book-meta {
+            font-size: 13px;
+            color: #4f4f4f;
+            margin-top: 2px;
+        }
+
+        .history-panel {
+            border: 1px solid #ddd;
+            border-top: none;
+            background: #f8f9fa;
+            border-radius: 0 0 8px 8px;
+            padding: 10px 14px;
+            margin-bottom: 12px;
+            display: none;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid #e5e5e5;
+        }
+
+        .history-item:last-child {
+            border-bottom: none;
+        }
+
+        .history-meta {
+            font-size: 13px;
+            color: #4a4a4a;
+            line-height: 1.4;
+        }
+
+        .history-current {
+            background: #198754;
+            color: #fff;
+            border-radius: 999px;
+            font-size: 11px;
+            padding: 2px 7px;
+            margin-left: 8px;
+        }
+
+        .history-missing {
+            color: #b33a3a;
+            font-size: 12px;
+        }
+
+        .pagination-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 14px;
+        }
+
+        .pagination-controls button {
+            border: 1px solid #c9c9c9;
+            background: #fff;
+            border-radius: 5px;
+            padding: 6px 10px;
+            cursor: pointer;
+        }
+
+        .pagination-controls button.active {
+            background: #007bff;
+            color: #fff;
+            border-color: #007bff;
+        }
+
+        .pagination-controls button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        @media (max-width: 900px) {
+            .list-controls {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .book-list-admin .book-item {
+                flex-direction: column;
+            }
+
+            .actions {
+                justify-content: flex-start;
+            }
+        }
+
+        @media (max-width: 560px) {
+            .list-controls {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -127,112 +370,36 @@ if (isset($_GET['logout'])) {
 
         <div class="upload-section">
             <input type="file" id="upload-input" accept=".pdf">
-            <button id="upload-btn" class="btn btn-primary">Upload New PDF</button>
+            <button id="upload-btn" class="btn btn-primary" type="button">Upload New PDF</button>
         </div>
 
+        <div class="list-controls">
+            <input type="text" id="search-input" placeholder="Search title or filename...">
+            <select id="status-filter">
+                <option value="active">Active</option>
+                <option value="trashed">Trash</option>
+                <option value="all">All</option>
+            </select>
+            <select id="per-page-select">
+                <option value="10">10 / page</option>
+                <option value="20">20 / page</option>
+                <option value="50">50 / page</option>
+            </select>
+            <button id="refresh-btn" class="btn btn-secondary" type="button">Refresh</button>
+        </div>
+
+        <div id="admin-message" class="status-message"></div>
+
         <h2>Uploaded Books</h2>
+        <div id="list-summary" class="list-summary"></div>
         <div id="admin-book-list" class="book-list-admin">
             <div class="loading">Loading books...</div>
         </div>
+        <div id="pagination-controls" class="pagination-controls"></div>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const uploadInput = document.getElementById('upload-input');
-            const uploadBtn = document.getElementById('upload-btn');
-            const bookList = document.getElementById('admin-book-list');
-
-            // Upload Logic
-            uploadBtn.addEventListener('click', () => {
-                const file = uploadInput.files[0];
-                if (!file) {
-                    alert('Please select a PDF file first.');
-                    return;
-                }
-
-                if (file.type !== 'application/pdf') {
-                    alert('Only PDF files are allowed.');
-                    return;
-                }
-
-                const formData = new FormData();
-                formData.append('pdf_file', file);
-
-                uploadBtn.textContent = 'Uploading...';
-                uploadBtn.disabled = true;
-
-                fetch('upload.php', {
-                    method: 'POST',
-                    body: formData
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            alert('Upload successful!');
-                            uploadInput.value = '';
-                            fetchBooks();
-                        } else {
-                            if (data.message === 'Unauthorized') {
-                                window.location.href = 'login.php';
-                            } else {
-                                alert('Upload failed: ' + data.message);
-                            }
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        alert('An error occurred.');
-                    })
-                    .finally(() => {
-                        uploadBtn.textContent = 'Upload New PDF';
-                        uploadBtn.disabled = false;
-                    });
-            });
-
-            // List Books
-            function fetchBooks() {
-                bookList.innerHTML = '<div class="loading">Loading...</div>';
-                fetch('list_books.php')
-                    .then(response => response.json())
-                    .then(data => {
-                        bookList.innerHTML = '';
-                        if (data.success && data.books.length > 0) {
-                            data.books.forEach(book => {
-                                const item = document.createElement('div');
-                                item.className = 'book-item';
-                                item.innerHTML = `
-                                <div>
-                                    <strong>${book.title}</strong><br>
-                                    <small>${new Date(book.uploaded_at).toLocaleDateString()}</small>
-                                </div>
-                                <div class="actions">
-                                    <a href="index.html?book=${encodeURIComponent(book.file_path)}" target="_blank" class="btn-view">View</a>
-                                    <button class="btn-copy" onclick="copyLink('${book.file_path}')">Copy Link</button>
-                                </div>
-                            `;
-                                bookList.appendChild(item);
-                            });
-                        } else {
-                            if (data.message === 'Unauthorized') {
-                                // Optional: Redirect or show login link
-                                bookList.innerHTML = '<div>Session expired. <a href="login.php">Login</a></div>';
-                            } else {
-                                bookList.innerHTML = '<div>No books found.</div>';
-                            }
-                        }
-                    });
-            }
-
-            window.copyLink = function (path) {
-                const url = window.location.origin + '/flipbook/index.html?book=' + encodeURIComponent(path);
-                navigator.clipboard.writeText(url).then(() => {
-                    alert('Link copied to clipboard!');
-                });
-            };
-
-            fetchBooks();
-        });
-    </script>
+    <script src="assets/js/admin.js"></script>
 </body>
 
 </html>
+

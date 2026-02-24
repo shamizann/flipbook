@@ -10,51 +10,52 @@
 
 <body>
 
-    <!-- Header / Controls (Empty - moved to bottom) -->
-
-    <!-- Library Sidebar Removed -->
-
-    <!-- Main Flipbook Container -->
     <div class="container">
         <div id="loader" class="loader">Loading PDF...</div>
+        <div id="error-message" class="error-message" role="alert"></div>
         <div id="flipbook">
             <div class="cover-message">Select a book from the Library</div>
         </div>
     </div>
 
-    <!-- Bottom Control Bar -->
     <div class="bottom-controls">
         <div class="left-group">
             <button id="prev-btn" class="nav-btn" title="Previous Page">&lt;</button>
         </div>
 
         <div class="center-group">
-            <button id="zoom-out" class="nav-btn" title="Zoom Out">➖</button>
-            <button id="zoom-reset" class="nav-btn" title="Reset Zoom">⟲</button>
-            <button id="zoom-in" class="nav-btn" title="Zoom In">➕</button>
+            <button id="zoom-out" class="nav-btn" title="Zoom Out">&minus;</button>
+            <button id="zoom-reset" class="nav-btn" title="Reset Zoom">&#10226;</button>
+            <button id="zoom-in" class="nav-btn" title="Zoom In">+</button>
+            <span id="page-indicator" class="page-indicator">0 / 0</span>
         </div>
 
         <div class="right-group">
             <button id="next-btn" class="nav-btn" title="Next Page">&gt;</button>
             <div class="menu-container">
-                <button id="menu-btn" class="nav-btn" title="More Options">⋯</button>
+                <button id="menu-btn" class="nav-btn" title="More Options">&#8942;</button>
                 <div id="menu-dropdown" class="menu-dropdown">
                     <button id="first-page-btn" class="menu-item">Go to First Page</button>
                     <button id="last-page-btn" class="menu-item">Go to Last Page</button>
+                    <div class="menu-jump">
+                        <label for="jump-page-input">Jump to page</label>
+                        <div class="menu-jump-row">
+                            <input id="jump-page-input" type="number" min="1" placeholder="Page #">
+                            <button id="jump-page-btn" class="menu-item menu-item-compact">Go</button>
+                        </div>
+                    </div>
+                    <button id="fullscreen-btn" class="menu-item">Toggle Fullscreen</button>
                     <a id="download-btn" class="menu-item" href="#" download>Download PDF</a>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Libraries -->
     <script src="assets/js/pdf.min.js"></script>
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'assets/js/pdf.worker.min.js';
     </script>
     <script src="assets/js/page-flip.browser.js"></script>
-
-    <!-- Main Script -->
     <script src="assets/js/main.js"></script>
 </body>
 

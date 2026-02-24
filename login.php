@@ -1,22 +1,29 @@
 <?php
+require 'db.php';
 session_start();
 
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = $_POST['username'] ?? '';
+    $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
 
-    // Hardcoded credentials as requested
-    $validUser = 'shamizan';
-    $validPass = 'jup1t3r!';
+    try {
+        $stmt = $pdo->prepare('SELECT id, password_hash FROM users WHERE username = ? LIMIT 1');
+        $stmt->execute([$username]);
+        $user = $stmt->fetch();
 
-    if ($username === $validUser && $password === $validPass) {
-        $_SESSION['admin_logged_in'] = true;
-        header('Location: admin.php');
-        exit;
-    } else {
+        if ($user && password_verify($password, $user['password_hash'])) {
+            session_regenerate_id(true);
+            $_SESSION['admin_logged_in'] = true;
+            $_SESSION['admin_user_id'] = (int) $user['id'];
+            header('Location: admin.php');
+            exit;
+        }
+
         $error = 'Invalid username or password';
+    } catch (PDOException $e) {
+        $error = 'Login is temporarily unavailable. Please try again later.';
     }
 }
 ?>
@@ -96,11 +103,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <form method="POST">
             <div class="form-group">
                 <label for="username">Username</label>
-                <input type="text" id="username" name="username" required>
+                <input type="text" id="username" name="username" autocomplete="username" required>
             </div>
             <div class="form-group">
                 <label for="password">Password</label>
-                <input type="password" id="password" name="password" required>
+                <input type="password" id="password" name="password" autocomplete="current-password" required>
             </div>
             <button type="submit" class="btn-login">Login</button>
         </form>

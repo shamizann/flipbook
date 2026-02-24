@@ -143,6 +143,18 @@ body {
     object-fit: contain;
 }
 
+.page-indicator {
+    background: rgba(30, 30, 30, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 13px;
+    min-width: 72px;
+    text-align: center;
+    backdrop-filter: blur(5px);
+}
+
 /* Bottom Control Bar */
 .bottom-controls {
     position: fixed;
@@ -296,6 +308,46 @@ body {
     background: rgba(255, 255, 255, 0.1);
 }
 
+.menu-item-compact {
+    padding: 8px 10px;
+    text-align: center;
+}
+
+.menu-jump {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px 2px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin: 2px 0;
+}
+
+.menu-jump label {
+    color: #ddd;
+    font-size: 12px;
+    padding: 0 6px;
+}
+
+.menu-jump-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.menu-jump-row input {
+    width: 90px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    border-radius: 4px;
+    padding: 8px;
+}
+
+.menu-jump-row input:focus {
+    outline: 1px solid rgba(255, 255, 255, 0.5);
+}
+
 .cover-message {
     color: #666;
     font-size: 1.2em;
@@ -323,4 +375,22 @@ body {
     /* Hidden by default */
     backdrop-filter: blur(5px);
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.error-message {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(160, 27, 27, 0.92);
+    color: #fff;
+    padding: 10px 16px;
+    border-radius: 8px;
+    z-index: 2100;
+    display: none;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.error-message.active {
+    display: block;
 }

@@ -8,3 +8,6 @@ uploads/*
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Temporary local test artifacts
+tmp_session/
