@@ -15,6 +15,10 @@
 - [x] Add keyboard navigation (`ArrowLeft`, `ArrowRight`, `Home`, `End`, `+`, `-`, `0`).
 - [x] Add fullscreen toggle.
 - [ ] Verify responsive behavior on desktop/mobile after feature changes.
+- [x] Align `Previous Page` and `Next Page` button behavior to use consistent native flip animations.
+- [x] Improve mobile viewport handling with `100dvh` and iOS safe-area bottom spacing.
+- [x] Improve mobile control usability with `44x44` touch targets and responsive control-bar layout.
+- [x] Improve touch panning behavior while zoomed to reduce unintended browser scrolling.
 - [x] Persist and restore last-read page per book (localStorage).
 - [x] Add error UI state for invalid/missing PDFs instead of `alert(...)`.
 - [x] Add basic logging and user-facing messages for upload/list/view failures.
@@ -53,3 +57,5 @@
 - [ ] Download link points to the resolved PDF.
 - [ ] Last-read page restores when reopening the same book.
 - [ ] Layout remains usable on desktop and mobile viewport sizes.
+- [ ] Mobile controls remain tappable and visible around safe-area/notch areas.
+- [ ] On touch devices while zoomed, drag-to-pan does not trigger unwanted page/bounce scrolling.

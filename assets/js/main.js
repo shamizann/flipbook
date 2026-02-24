@@ -237,39 +237,6 @@ document.addEventListener('DOMContentLoaded', function () {
         pageFlip.flip(target);
     }
 
-    function flipPrevWithNextStyle(corner) {
-        if (!pageFlip) {
-            return;
-        }
-
-        const collection = pageFlip.getPageCollection();
-        const currentSpreadIndex = collection.getCurrentSpreadIndex();
-
-        if (currentSpreadIndex <= 0) {
-            return;
-        }
-
-        // Keep default cover behavior for first spread transition.
-        if (currentSpreadIndex === 1 || pageFlip.getOrientation() !== 'landscape') {
-            pageFlip.flipPrev(corner);
-            return;
-        }
-
-        try {
-            // Shift one spread back, then run next-style flip animation to land on previous spread.
-            collection.setCurrentSpreadIndex(currentSpreadIndex - 2);
-            pageFlip.flipNext(corner);
-        } catch (error) {
-            console.error(error);
-            try {
-                collection.setCurrentSpreadIndex(currentSpreadIndex);
-            } catch (restoreError) {
-                console.error(restoreError);
-            }
-            pageFlip.flipPrev(corner);
-        }
-    }
-
     function updateFullscreenLabel() {
         if (!fullscreenBtn) {
             return;
@@ -344,7 +311,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     prevBtn.addEventListener('click', function () {
-        flipPrevWithNextStyle('top');
+        if (pageFlip) {
+            pageFlip.flipPrev();
+        }
     });
 
     nextBtn.addEventListener('click', function () {
@@ -457,7 +426,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     container.addEventListener('touchstart', function (event) {
-        if (currentZoom <= 1) {
+        if (currentZoom <= 1 || event.touches.length !== 1) {
             return;
         }
 
@@ -477,13 +446,14 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        event.preventDefault();
         const x = event.touches[0].pageX - container.offsetLeft;
         const y = event.touches[0].pageY - container.offsetTop;
         const walkX = x - startX;
         const walkY = y - startY;
         container.scrollLeft = scrollLeft - walkX;
         container.scrollTop = scrollTop - walkY;
-    });
+    }, { passive: false });
 
     document.addEventListener('keydown', function (event) {
         const activeTag = document.activeElement && document.activeElement.tagName;

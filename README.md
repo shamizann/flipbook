@@ -11,7 +11,7 @@ The project includes:
 - Search/filter/pagination for large libraries
 - PDF metadata in admin (file size, page count, uploader, timestamps)
 - Link sharing with `book_id` (not raw file path)
-- Flipbook viewer with zoom, page jump, fullscreen, keyboard shortcuts, and last-page restore
+- Flipbook viewer with consistent prev/next flip animation, zoom, page jump, fullscreen, keyboard shortcuts, last-page restore, and mobile-optimized controls
 
 ## Stack
 
@@ -149,6 +149,14 @@ Then open `http://localhost:8000/login.php`.
   - `Home` / `End`: first/last
   - `+` / `-`: zoom in/out
   - `0`: reset zoom
+
+## Mobile View Notes
+
+- Responsive control bar for smaller screens (`<= 768px`)
+- Touch target size tuned for mobile controls (`44x44px` minimum)
+- Safe-area aware bottom spacing for iOS devices (`env(safe-area-inset-bottom)`)
+- Uses dynamic viewport height (`100dvh`) to reduce Safari address-bar viewport jump
+- Touch drag-to-pan is optimized for zoomed mode to reduce accidental page/bounce scrolling
 
 ## Security Notes
 

@@ -112,7 +112,10 @@ Suggested schedule:
 7. Move a book to trash, confirm it is hidden from active list, then restore it.
 8. Open viewer link `index.html?id=<book_id>`.
 9. Test flip, zoom, jump, fullscreen, and download.
-10. Reopen same book and verify last page restore.
+10. Test mobile viewport (`<=768px`) to confirm control bar remains usable and does not overlap critical content.
+11. On iOS/mobile, confirm controls remain accessible near safe-area/notch/home-indicator regions.
+12. While zoomed on touch device, verify drag-to-pan works without unwanted browser bounce/scroll.
+13. Reopen same book and verify last page restore.
 
 ## 9) Troubleshooting
 
