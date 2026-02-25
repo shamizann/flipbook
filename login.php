@@ -1,29 +1,39 @@
 <?php
 require 'db.php';
+require_once 'csrf.php';
+require_once 'audit.php';
 session_start();
 
 $error = '';
+$csrfToken = getCsrfToken();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = trim($_POST['username'] ?? '');
-    $password = $_POST['password'] ?? '';
+    $postedToken = $_POST['csrf_token'] ?? null;
+    if (!isValidCsrfToken(is_string($postedToken) ? $postedToken : null)) {
+        $error = 'Invalid session token. Please refresh and try again.';
+    } else {
+        $username = trim($_POST['username'] ?? '');
+        $password = $_POST['password'] ?? '';
 
-    try {
-        $stmt = $pdo->prepare('SELECT id, password_hash FROM users WHERE username = ? LIMIT 1');
-        $stmt->execute([$username]);
-        $user = $stmt->fetch();
+        try {
+            $stmt = $pdo->prepare('SELECT id, password_hash FROM users WHERE username = ? LIMIT 1');
+            $stmt->execute([$username]);
+            $user = $stmt->fetch();
 
-        if ($user && password_verify($password, $user['password_hash'])) {
-            session_regenerate_id(true);
-            $_SESSION['admin_logged_in'] = true;
-            $_SESSION['admin_user_id'] = (int) $user['id'];
-            header('Location: admin.php');
-            exit;
+            if ($user && password_verify($password, $user['password_hash'])) {
+                session_regenerate_id(true);
+                $adminUserId = (int) $user['id'];
+                $_SESSION['admin_logged_in'] = true;
+                $_SESSION['admin_user_id'] = $adminUserId;
+                writeAdminAuditLog($pdo, 'login', $adminUserId, null, ['username' => $username]);
+                header('Location: admin.php');
+                exit;
+            }
+
+            $error = 'Invalid username or password';
+        } catch (PDOException $e) {
+            $error = 'Login is temporarily unavailable. Please try again later.';
         }
-
-        $error = 'Invalid username or password';
-    } catch (PDOException $e) {
-        $error = 'Login is temporarily unavailable. Please try again later.';
     }
 }
 ?>
@@ -101,6 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         <?php endif; ?>
         <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
             <div class="form-group">
                 <label for="username">Username</label>
                 <input type="text" id="username" name="username" autocomplete="username" required>

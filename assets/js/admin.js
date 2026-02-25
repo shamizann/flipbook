@@ -9,6 +9,21 @@ document.addEventListener('DOMContentLoaded', function () {
     const refreshBtn = document.getElementById('refresh-btn');
     const listSummary = document.getElementById('list-summary');
     const paginationControls = document.getElementById('pagination-controls');
+    const auditActionFilter = document.getElementById('audit-action-filter');
+    const auditPerPageSelect = document.getElementById('audit-per-page-select');
+    const auditRefreshBtn = document.getElementById('audit-refresh-btn');
+    const auditSummary = document.getElementById('audit-summary');
+    const auditLogList = document.getElementById('audit-log-list');
+    const auditPaginationControls = document.getElementById('audit-pagination-controls');
+    const editTitleModal = document.getElementById('edit-title-modal');
+    const editTitleForm = document.getElementById('edit-title-form');
+    const editTitleInput = document.getElementById('edit-title-input');
+    const editTitleError = document.getElementById('edit-title-error');
+    const editTitleBookLabel = document.getElementById('edit-title-book-label');
+    const editTitleCancelBtn = document.getElementById('edit-title-cancel');
+    const editTitleSaveBtn = document.getElementById('edit-title-save');
+    const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
+    const csrfToken = csrfTokenMeta ? csrfTokenMeta.getAttribute('content') : '';
 
     const state = {
         page: 1,
@@ -17,7 +32,14 @@ document.addEventListener('DOMContentLoaded', function () {
         q: ''
     };
 
+    const auditState = {
+        page: 1,
+        perPage: 10,
+        action: ''
+    };
+
     let searchDebounceTimer = null;
+    let editTitleContext = null;
 
     function showMessage(text, type = 'info') {
         messageBox.textContent = text;
@@ -27,6 +49,17 @@ document.addEventListener('DOMContentLoaded', function () {
     function clearMessage() {
         messageBox.textContent = '';
         messageBox.className = 'status-message';
+    }
+
+    function appendCsrfToken(formData) {
+        if (!csrfToken) {
+            return;
+        }
+        formData.append('csrf_token', csrfToken);
+    }
+
+    function isCsrfTokenError(message) {
+        return String(message || '').toLowerCase().includes('csrf');
     }
 
     function formatBytes(value) {
@@ -120,6 +153,225 @@ document.addEventListener('DOMContentLoaded', function () {
         paginationControls.appendChild(makePageButton('Next', Math.min(totalPages, currentPage + 1), currentPage >= totalPages, false));
     }
 
+    function updateAuditSummary(pagination) {
+        if (!auditSummary) {
+            return;
+        }
+
+        if (!pagination) {
+            auditSummary.textContent = '';
+            return;
+        }
+
+        const total = Number(pagination.total) || 0;
+        const perPage = Number(pagination.perPage) || auditState.perPage;
+        const page = Number(pagination.page) || auditState.page;
+        const from = total === 0 ? 0 : (page - 1) * perPage + 1;
+        const to = Math.min(total, page * perPage);
+        auditSummary.textContent = `Showing ${from}-${to} of ${total} audit log entries`;
+    }
+
+    function renderAuditPagination(pagination) {
+        if (!auditPaginationControls) {
+            return;
+        }
+
+        auditPaginationControls.innerHTML = '';
+        if (!pagination || (pagination.totalPages || 1) <= 1) {
+            return;
+        }
+
+        const totalPages = Number(pagination.totalPages) || 1;
+        const currentPage = Number(pagination.page) || 1;
+
+        function makePageButton(label, targetPage, disabled, isActive) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = label;
+            button.disabled = disabled;
+            if (isActive) {
+                button.classList.add('active');
+            }
+            button.addEventListener('click', () => {
+                if (targetPage === auditState.page) {
+                    return;
+                }
+                auditState.page = targetPage;
+                fetchAuditLogs();
+            });
+            return button;
+        }
+
+        auditPaginationControls.appendChild(makePageButton('Prev', Math.max(1, currentPage - 1), currentPage <= 1, false));
+
+        const start = Math.max(1, currentPage - 2);
+        const end = Math.min(totalPages, currentPage + 2);
+        for (let i = start; i <= end; i += 1) {
+            auditPaginationControls.appendChild(makePageButton(String(i), i, false, i === currentPage));
+        }
+
+        auditPaginationControls.appendChild(makePageButton('Next', Math.min(totalPages, currentPage + 1), currentPage >= totalPages, false));
+    }
+
+    function formatActionLabel(value) {
+        const action = String(value || '').trim();
+        return action === '' ? 'unknown' : action;
+    }
+
+    function formatAuditDetails(detailsRaw) {
+        if (detailsRaw === null || detailsRaw === undefined || detailsRaw === '') {
+            return '-';
+        }
+
+        let details = detailsRaw;
+        if (typeof detailsRaw === 'string') {
+            try {
+                details = JSON.parse(detailsRaw);
+            } catch (_error) {
+                return detailsRaw.length > 120 ? `${detailsRaw.slice(0, 117)}...` : detailsRaw;
+            }
+        }
+
+        if (details && typeof details === 'object' && !Array.isArray(details)) {
+            const entries = Object.entries(details).slice(0, 4).map(([key, value]) => {
+                const normalized = value === null || value === undefined ? 'null' : String(value);
+                return `${key}: ${normalized}`;
+            });
+            return entries.length > 0 ? entries.join(' | ') : '-';
+        }
+
+        if (Array.isArray(details)) {
+            const serialized = JSON.stringify(details);
+            if (!serialized) {
+                return '-';
+            }
+            return serialized.length > 120 ? `${serialized.slice(0, 117)}...` : serialized;
+        }
+
+        const text = String(details);
+        return text.length > 120 ? `${text.slice(0, 117)}...` : text;
+    }
+
+    function renderAuditLogs(logs) {
+        if (!auditLogList) {
+            return;
+        }
+
+        auditLogList.innerHTML = '';
+
+        if (!Array.isArray(logs) || logs.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'audit-empty';
+            empty.textContent = 'No audit logs found.';
+            auditLogList.appendChild(empty);
+            return;
+        }
+
+        const table = document.createElement('table');
+        table.className = 'audit-table';
+
+        const thead = document.createElement('thead');
+        const headRow = document.createElement('tr');
+        ['Time', 'Action', 'Admin', 'Book', 'Request', 'Details'].forEach(label => {
+            const th = document.createElement('th');
+            th.textContent = label;
+            headRow.appendChild(th);
+        });
+        thead.appendChild(headRow);
+
+        const tbody = document.createElement('tbody');
+        logs.forEach(log => {
+            const row = document.createElement('tr');
+
+            const timeCell = document.createElement('td');
+            timeCell.textContent = formatDateTime(log.created_at);
+
+            const actionCell = document.createElement('td');
+            const actionPill = document.createElement('span');
+            actionPill.className = 'audit-action-pill';
+            actionPill.textContent = formatActionLabel(log.action);
+            actionCell.appendChild(actionPill);
+
+            const adminCell = document.createElement('td');
+            adminCell.textContent = log.admin_username || (log.admin_user_id ? `User #${log.admin_user_id}` : 'System');
+
+            const bookCell = document.createElement('td');
+            if (log.book_id) {
+                const title = log.book_title ? ` - ${log.book_title}` : '';
+                bookCell.textContent = `#${log.book_id}${title}`;
+            } else {
+                bookCell.textContent = '-';
+            }
+
+            const requestCell = document.createElement('td');
+            requestCell.textContent = log.ip_address || '-';
+            const requestMeta = document.createElement('div');
+            requestMeta.className = 'audit-secondary';
+            requestMeta.textContent = log.user_agent || '-';
+            requestMeta.title = log.user_agent || '';
+            requestCell.appendChild(requestMeta);
+
+            const detailsCell = document.createElement('td');
+            detailsCell.textContent = formatAuditDetails(log.details_json);
+
+            row.appendChild(timeCell);
+            row.appendChild(actionCell);
+            row.appendChild(adminCell);
+            row.appendChild(bookCell);
+            row.appendChild(requestCell);
+            row.appendChild(detailsCell);
+            tbody.appendChild(row);
+        });
+
+        table.appendChild(thead);
+        table.appendChild(tbody);
+        auditLogList.appendChild(table);
+    }
+
+    function fetchAuditLogs() {
+        if (!auditLogList) {
+            return;
+        }
+
+        auditLogList.innerHTML = '<div class="audit-empty">Loading audit logs...</div>';
+
+        const params = new URLSearchParams();
+        params.set('page', String(auditState.page));
+        params.set('per_page', String(auditState.perPage));
+        if (auditState.action) {
+            params.set('action', auditState.action);
+        }
+
+        fetch(`list_audit_logs.php?${params.toString()}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to load audit logs.');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (!data.success) {
+                    if (data.message === 'Unauthorized') {
+                        window.location.href = 'login.php';
+                        return;
+                    }
+                    throw new Error(data.message || 'Failed to load audit logs.');
+                }
+
+                renderAuditLogs(data.logs || []);
+                updateAuditSummary(data.pagination);
+                renderAuditPagination(data.pagination);
+            })
+            .catch(error => {
+                console.error(error);
+                auditLogList.innerHTML = '<div class="audit-empty">Unable to load audit logs.</div>';
+                updateAuditSummary(null);
+                if (auditPaginationControls) {
+                    auditPaginationControls.innerHTML = '';
+                }
+            });
+    }
+
     function copyLink(bookId) {
         const viewerUrl = new URL('index.html', window.location.href);
         viewerUrl.search = '';
@@ -148,6 +400,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const formData = new FormData();
         formData.append('id', String(book.id));
         formData.append('pdf_file', file);
+        appendCsrfToken(formData);
 
         return fetch('replace_book.php', {
             method: 'POST',
@@ -164,8 +417,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     const versionMessage = data.version ? ` (v${data.version})` : '';
                     showMessage(`PDF replaced successfully${versionMessage}.`, 'success');
                     fetchBooks();
+                    fetchAuditLogs();
                 } else if (data.message === 'Unauthorized') {
                     window.location.href = 'login.php';
+                } else if (isCsrfTokenError(data.message)) {
+                    showMessage('Session token expired. Please refresh this page.', 'error');
                 } else {
                     showMessage('Replace failed: ' + (data.message || 'Unknown error.'), 'error');
                 }
@@ -178,6 +434,156 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (triggerButton) {
                     triggerButton.disabled = false;
                     triggerButton.textContent = 'Replace PDF';
+                }
+            });
+    }
+
+    function setEditTitleError(message) {
+        if (!editTitleError) {
+            return;
+        }
+        editTitleError.textContent = message || '';
+    }
+
+    function setEditTitleSubmitting(isSubmitting) {
+        if (editTitleSaveBtn) {
+            editTitleSaveBtn.disabled = isSubmitting;
+            editTitleSaveBtn.textContent = isSubmitting ? 'Saving...' : 'Save Title';
+        }
+
+        if (editTitleCancelBtn) {
+            editTitleCancelBtn.disabled = isSubmitting;
+        }
+
+        if (editTitleContext && editTitleContext.triggerButton) {
+            editTitleContext.triggerButton.disabled = isSubmitting;
+            editTitleContext.triggerButton.textContent = isSubmitting ? 'Saving...' : 'Edit Title';
+        }
+    }
+
+    function isEditTitleSubmitting() {
+        return !!(editTitleSaveBtn && editTitleSaveBtn.disabled);
+    }
+
+    function closeEditTitleModal() {
+        if (!editTitleModal) {
+            return;
+        }
+
+        setEditTitleSubmitting(false);
+        setEditTitleError('');
+        editTitleModal.classList.remove('active');
+        editTitleModal.setAttribute('aria-hidden', 'true');
+
+        if (editTitleForm) {
+            editTitleForm.reset();
+        }
+
+        if (editTitleBookLabel) {
+            editTitleBookLabel.textContent = '';
+        }
+
+        editTitleContext = null;
+    }
+
+    function openEditTitleModal(book, triggerButton) {
+        if (!editTitleModal || !editTitleInput) {
+            showMessage('Edit title dialog is unavailable.', 'error');
+            return;
+        }
+
+        const currentTitle = String(book.title || '').trim();
+        editTitleContext = {
+            bookId: Number(book.id),
+            currentTitle,
+            triggerButton
+        };
+
+        setEditTitleError('');
+        setEditTitleSubmitting(false);
+
+        if (editTitleBookLabel) {
+            editTitleBookLabel.textContent = `Book #${book.id}`;
+        }
+
+        editTitleInput.value = currentTitle;
+        editTitleModal.classList.add('active');
+        editTitleModal.setAttribute('aria-hidden', 'false');
+
+        window.setTimeout(() => {
+            editTitleInput.focus();
+            editTitleInput.select();
+        }, 0);
+    }
+
+    function submitEditTitle() {
+        if (!editTitleContext || !editTitleInput) {
+            return;
+        }
+
+        const currentTitle = editTitleContext.currentTitle;
+        const nextTitle = String(editTitleInput.value || '').trim();
+
+        if (nextTitle === '') {
+            setEditTitleError('Title cannot be empty.');
+            return;
+        }
+
+        if (nextTitle.length > 255) {
+            setEditTitleError('Title is too long (max 255 characters).');
+            return;
+        }
+
+        if (nextTitle === currentTitle) {
+            closeEditTitleModal();
+            showMessage('Title is unchanged.', 'info');
+            return;
+        }
+
+        setEditTitleError('');
+        setEditTitleSubmitting(true);
+        showMessage(`Updating title for "${currentTitle}"...`, 'info');
+
+        const formData = new FormData();
+        formData.append('id', String(editTitleContext.bookId));
+        formData.append('title', nextTitle);
+        appendCsrfToken(formData);
+
+        fetch('update_book.php', {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Update title request failed.');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    closeEditTitleModal();
+                    showMessage(data.message || 'Title updated.', 'success');
+                    fetchBooks();
+                    fetchAuditLogs();
+                } else if (data.message === 'Unauthorized') {
+                    window.location.href = 'login.php';
+                } else if (isCsrfTokenError(data.message)) {
+                    setEditTitleError('Session token expired. Refresh this page and try again.');
+                    showMessage('Session token expired. Please refresh this page.', 'error');
+                } else {
+                    const errorText = data.message || 'Unknown error.';
+                    setEditTitleError(errorText);
+                    showMessage('Update title failed: ' + errorText, 'error');
+                }
+            })
+            .catch(error => {
+                console.error(error);
+                setEditTitleError('Network or server error while updating title.');
+                showMessage('Update title failed due to a network or server error.', 'error');
+            })
+            .finally(() => {
+                if (editTitleContext) {
+                    setEditTitleSubmitting(false);
                 }
             });
     }
@@ -294,6 +700,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const formData = new FormData();
         formData.append('id', String(book.id));
+        appendCsrfToken(formData);
 
         fetch('delete_book.php', {
             method: 'POST',
@@ -309,8 +716,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (data.success) {
                     showMessage(data.message || 'Book moved to trash.', 'success');
                     fetchBooks();
+                    fetchAuditLogs();
                 } else if (data.message === 'Unauthorized') {
                     window.location.href = 'login.php';
+                } else if (isCsrfTokenError(data.message)) {
+                    showMessage('Session token expired. Please refresh this page.', 'error');
                 } else {
                     showMessage('Failed: ' + (data.message || 'Unknown error.'), 'error');
                 }
@@ -337,6 +747,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const formData = new FormData();
         formData.append('id', String(book.id));
+        appendCsrfToken(formData);
 
         fetch('restore_book.php', {
             method: 'POST',
@@ -352,8 +763,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (data.success) {
                     showMessage(data.message || 'Book restored from trash.', 'success');
                     fetchBooks();
+                    fetchAuditLogs();
                 } else if (data.message === 'Unauthorized') {
                     window.location.href = 'login.php';
+                } else if (isCsrfTokenError(data.message)) {
+                    showMessage('Session token expired. Please refresh this page.', 'error');
                 } else {
                     showMessage('Restore failed: ' + (data.message || 'Unknown error.'), 'error');
                 }
@@ -366,6 +780,72 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (triggerButton) {
                     triggerButton.disabled = false;
                     triggerButton.textContent = 'Restore';
+                }
+            });
+    }
+
+    function hardDeleteBook(book, triggerButton) {
+        const firstConfirm = window.confirm(
+            `Permanently delete "${book.title}" and its version history?\n\nThis action cannot be undone.`
+        );
+        if (!firstConfirm) {
+            return;
+        }
+
+        const phrase = window.prompt('Type DELETE to permanently remove this book:', '');
+        if (phrase === null) {
+            return;
+        }
+
+        if (phrase.trim() !== 'DELETE') {
+            showMessage('Permanent delete cancelled. Confirmation text did not match.', 'error');
+            return;
+        }
+
+        if (triggerButton) {
+            triggerButton.disabled = true;
+            triggerButton.textContent = 'Deleting...';
+        }
+
+        showMessage(`Permanently deleting "${book.title}"...`, 'info');
+
+        const formData = new FormData();
+        formData.append('id', String(book.id));
+        formData.append('confirm_phrase', 'DELETE');
+        appendCsrfToken(formData);
+
+        fetch('hard_delete_book.php', {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Hard delete request failed.');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    const summary = `Deleted file(s): ${data.deletedFilesCount || 0}, missing: ${data.missingFilesCount || 0}, skipped: ${data.skippedFilesCount || 0}.`;
+                    showMessage(`${data.message || 'Book permanently deleted.'} ${summary}`, 'success');
+                    fetchBooks();
+                    fetchAuditLogs();
+                } else if (data.message === 'Unauthorized') {
+                    window.location.href = 'login.php';
+                } else if (isCsrfTokenError(data.message)) {
+                    showMessage('Session token expired. Please refresh this page.', 'error');
+                } else {
+                    showMessage('Permanent delete failed: ' + (data.message || 'Unknown error.'), 'error');
+                }
+            })
+            .catch(error => {
+                console.error(error);
+                showMessage('Permanent delete failed due to a network or server error.', 'error');
+            })
+            .finally(() => {
+                if (triggerButton) {
+                    triggerButton.disabled = false;
+                    triggerButton.textContent = 'Hard Delete';
                 }
             });
     }
@@ -469,6 +949,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 replaceButton.className = 'btn-replace';
                 replaceButton.textContent = 'Replace PDF';
 
+                const editButton = document.createElement('button');
+                editButton.type = 'button';
+                editButton.className = 'btn-edit';
+                editButton.textContent = 'Edit Title';
+                editButton.addEventListener('click', () => openEditTitleModal(book, editButton));
+
                 const replaceInput = document.createElement('input');
                 replaceInput.type = 'file';
                 replaceInput.accept = '.pdf';
@@ -494,6 +980,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 actions.appendChild(viewLink);
                 actions.appendChild(copyButton);
+                actions.appendChild(editButton);
                 actions.appendChild(replaceButton);
                 actions.appendChild(historyButton);
                 actions.appendChild(trashButton);
@@ -505,8 +992,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 restoreButton.textContent = 'Restore';
                 restoreButton.addEventListener('click', () => restoreBook(book, restoreButton));
 
+                const hardDeleteButton = document.createElement('button');
+                hardDeleteButton.type = 'button';
+                hardDeleteButton.className = 'btn-hard-delete';
+                hardDeleteButton.textContent = 'Hard Delete';
+                hardDeleteButton.addEventListener('click', () => hardDeleteBook(book, hardDeleteButton));
+
                 actions.appendChild(historyButton);
                 actions.appendChild(restoreButton);
+                actions.appendChild(hardDeleteButton);
             }
 
             item.appendChild(info);
@@ -570,6 +1064,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const formData = new FormData();
         formData.append('pdf_file', file);
+        appendCsrfToken(formData);
 
         uploadBtn.textContent = 'Uploading...';
         uploadBtn.disabled = true;
@@ -593,8 +1088,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     state.status = 'active';
                     statusFilter.value = 'active';
                     fetchBooks();
+                    fetchAuditLogs();
                 } else if (data.message === 'Unauthorized') {
                     window.location.href = 'login.php';
+                } else if (isCsrfTokenError(data.message)) {
+                    showMessage('Session token expired. Please refresh this page.', 'error');
                 } else {
                     showMessage('Upload failed: ' + data.message, 'error');
                 }
@@ -636,7 +1134,66 @@ document.addEventListener('DOMContentLoaded', function () {
     refreshBtn.addEventListener('click', () => {
         clearMessage();
         fetchBooks();
+        fetchAuditLogs();
+    });
+
+    if (auditActionFilter) {
+        auditActionFilter.addEventListener('change', () => {
+            auditState.action = auditActionFilter.value;
+            auditState.page = 1;
+            fetchAuditLogs();
+        });
+    }
+
+    if (auditPerPageSelect) {
+        auditPerPageSelect.addEventListener('change', () => {
+            auditState.perPage = Number.parseInt(auditPerPageSelect.value, 10) || 10;
+            auditState.page = 1;
+            fetchAuditLogs();
+        });
+    }
+
+    if (auditRefreshBtn) {
+        auditRefreshBtn.addEventListener('click', () => {
+            fetchAuditLogs();
+        });
+    }
+
+    if (editTitleForm) {
+        editTitleForm.addEventListener('submit', event => {
+            event.preventDefault();
+            submitEditTitle();
+        });
+    }
+
+    if (editTitleCancelBtn) {
+        editTitleCancelBtn.addEventListener('click', () => {
+            if (isEditTitleSubmitting()) {
+                return;
+            }
+            closeEditTitleModal();
+        });
+    }
+
+    if (editTitleModal) {
+        editTitleModal.addEventListener('click', event => {
+            if (event.target !== editTitleModal || isEditTitleSubmitting()) {
+                return;
+            }
+            closeEditTitleModal();
+        });
+    }
+
+    document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape') {
+            return;
+        }
+        if (!editTitleModal || !editTitleModal.classList.contains('active') || isEditTitleSubmitting()) {
+            return;
+        }
+        closeEditTitleModal();
     });
 
     fetchBooks();
+    fetchAuditLogs();
 });

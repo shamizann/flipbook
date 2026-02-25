@@ -6,8 +6,11 @@ The project includes:
 - Admin login and library management
 - PDF upload with server-side validation
 - Trash + restore workflow (soft delete, no immediate permanent removal)
+- Optional hard-delete for trashed books with second confirmation
+- Manual metadata update via admin modal (edit `title` without replacing PDF)
 - PDF replacement with stable link (`book_id` stays the same)
 - Version history for each book in admin dashboard
+- Admin audit trail (`login`, `upload`, `replace`, `update_title`, `trash`, `restore`, `hard_delete`, cleanup job)
 - Search/filter/pagination for large libraries
 - PDF metadata in admin (file size, page count, uploader, timestamps)
 - Link sharing with `book_id` (not raw file path)
@@ -29,13 +32,19 @@ flipbook/
   login.php            # Admin authentication
   upload.php           # Authenticated PDF upload endpoint
   replace_book.php     # Authenticated replace endpoint (new version, same book id)
+  update_book.php      # Authenticated metadata update endpoint (book title)
   restore_book.php     # Authenticated restore-from-trash endpoint
+  hard_delete_book.php # Authenticated permanent delete endpoint for trashed books
   list_books.php       # Authenticated library listing endpoint
+  list_audit_logs.php  # Authenticated admin audit log listing endpoint
   list_book_versions.php # Authenticated version history endpoint
   delete_book.php      # Authenticated move-to-trash endpoint
   get_book.php         # Public endpoint to resolve book id -> validated file URL
   index.html           # Reader UI
   db.php               # DB connection (env-driven)
+  csrf.php             # CSRF token helpers
+  audit.php            # Admin audit logging helpers
+  cleanup_orphan_uploads.php # CLI cleanup for orphaned upload files
   schema.sql           # DB schema
   migrations/          # Upgrade SQL migrations
   uploads/             # Stored PDF files
@@ -71,6 +80,7 @@ If you already had this project running before version history was added, also r
 ```sql
 SOURCE migrations/2026-02-24-book-versions.sql;
 SOURCE migrations/2026-02-24-soft-delete-metadata.sql;
+SOURCE migrations/2026-02-25-admin-audit-trail.sql;
 ```
 
 ### 2) Configure DB connection
@@ -131,8 +141,10 @@ Then open `http://localhost:8000/login.php`.
 1. Login at `/login.php`.
 2. Upload PDF in `/admin.php`.
 3. Use `View` to open the book, `Copy Link` to share it, `Replace PDF` to publish a new version with same link, or `Move to Trash` to hide it.
-4. Restore books from `Trash` when needed.
-5. Reader resolves `id` via `get_book.php`, then loads the PDF.
+4. Use `Edit Title` modal to update metadata without replacing the PDF file.
+5. Restore books from `Trash` when needed, or `Hard Delete` with second confirmation for permanent removal.
+6. Review recent admin actions in `Audit Trail` section (filter by action and paginate).
+7. Reader resolves `id` via `get_book.php`, then loads the PDF.
 
 ## Reader Controls
 
@@ -158,15 +170,27 @@ Then open `http://localhost:8000/login.php`.
 - Uses dynamic viewport height (`100dvh`) to reduce Safari address-bar viewport jump
 - Touch drag-to-pan is optimized for zoomed mode to reduce accidental page/bounce scrolling
 
+## Known Mobile Limitations
+
+- On very small devices in landscape mode, readable page area is reduced and controls may feel denser than portrait mode.
+- Fullscreen support depends on browser capabilities; some mobile browsers (especially iOS Safari contexts) may not enter true fullscreen.
+- Browser UI chrome (address/tab bars) can still change visible viewport height while scrolling, even with `100dvh`.
+
 ## Security Notes
 
 - Admin-only endpoints:
   - `upload.php`
   - `list_books.php`
   - `replace_book.php`
+  - `update_book.php`
   - `delete_book.php`
   - `restore_book.php`
+  - `hard_delete_book.php`
+  - `list_audit_logs.php`
   - `list_book_versions.php`
+- CSRF protection:
+  - Login form validates session token.
+  - Admin POST actions (`upload`, `replace`, `trash`, `restore`, `hard delete`) require CSRF token.
 - Upload validation includes:
   - extension check (`.pdf`)
   - MIME check (`application/pdf`)
@@ -184,7 +208,6 @@ Then open `http://localhost:8000/login.php`.
 - Trashed books are not served by `get_book.php`.
 
 Current limitations to consider for production:
-- No CSRF protection on admin actions yet
 - No rate limiting / brute-force protection
 - `get_book.php` is public (good for share links, not for private documents)
 
@@ -200,4 +223,7 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for production checklist and harden
 
 - Main enhancement checklist: [TASKS.md](TASKS.md)
 - Keep `uploads/` and DB backups in sync
+- Cleanup orphan files periodically:
+  - Dry run: `php cleanup_orphan_uploads.php`
+  - Delete mode: `php cleanup_orphan_uploads.php --delete`
 - Re-run regression checklist after each significant change

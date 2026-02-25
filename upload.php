@@ -1,5 +1,7 @@
 <?php
 require 'db.php';
+require_once 'csrf.php';
+require_once 'audit.php';
 session_start();
 
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
@@ -28,8 +30,17 @@ function getPdfPageCount(string $filePath): ?int
     return $count;
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_FILES['pdf_file']) && $_FILES['pdf_file']['error'] === UPLOAD_ERR_OK) {
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    $response['message'] = 'Method not allowed.';
+    header('Content-Type: application/json');
+    echo json_encode($response);
+    exit;
+}
+
+requireCsrfTokenForJsonPost();
+
+if (isset($_FILES['pdf_file']) && $_FILES['pdf_file']['error'] === UPLOAD_ERR_OK) {
         $uploadDir = 'uploads/';
         if (!is_dir($uploadDir)) {
             if (!mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
@@ -113,6 +124,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
 
                     $pdo->commit();
+                    writeAdminAuditLog($pdo, 'upload', $adminUserId, $bookId, [
+                        'file_name' => $originalFileName,
+                        'stored_path' => $targetPath,
+                        'file_size_bytes' => $fileSizeBytes,
+                        'page_count' => $pageCount,
+                    ]);
                     $response['success'] = true;
                     $response['message'] = 'File uploaded successfully.';
                     $response['bookId'] = $bookId;
@@ -143,9 +160,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
                 $response['message'] = 'Failed to move uploaded file.';
         }
-    } else {
-        $response['message'] = 'No file uploaded or upload error.';
-    }
+} else {
+    $response['message'] = 'No file uploaded or upload error.';
 }
 
 header('Content-Type: application/json');

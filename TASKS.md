@@ -33,13 +33,16 @@
 - [x] Add pagination in admin list (`page`, `per_page`) with summary + page controls.
 - [x] Show metadata in admin list (file size, page count, uploaded by/time, updated by/time).
 - [x] Extend version history with metadata per version (size/pages/uploader/time).
+- [x] Add audit log viewer section in admin UI (filter + pagination for recent actions).
+- [x] Add manual metadata edit action (update book title without replacing PDF).
+- [x] Replace browser `prompt` for Edit Title with in-page modal UI and inline validation.
 
 ## Suggested Next Improvements
 
-- [ ] Add optional hard-delete action for trash items (with second confirmation) for storage cleanup.
-- [ ] Add audit trail table for admin actions (`upload`, `replace`, `trash`, `restore`, `login`).
-- [ ] Add CSRF tokens to admin POST actions (`upload`, `replace`, `trash`, `restore`).
-- [ ] Add permanent file cleanup job for orphaned uploads (old versions no longer referenced).
+- [x] Add optional hard-delete action for trash items (with second confirmation) for storage cleanup.
+- [x] Add audit trail table for admin actions (`upload`, `replace`, `trash`, `restore`, `login`).
+- [x] Add CSRF tokens to admin POST actions (`upload`, `replace`, `trash`, `restore`).
+- [x] Add permanent file cleanup job for orphaned uploads (old versions no longer referenced).
 
 ## Regression Checklist
 
@@ -48,6 +51,11 @@
 - [ ] Book list loads and view/copy link actions use `?id=<book_id>`.
 - [ ] Admin search/filter/pagination works as expected with >20 books.
 - [ ] Trash/restore flow works and trashed books are not served by `get_book.php` (HTTP 410).
+- [ ] Hard-delete flow requires second confirmation and permanently removes trashed book metadata.
+- [ ] Hard-delete cleans unreferenced files while keeping still-referenced files intact.
+- [ ] Edit Title flow updates metadata without changing `book_id` or file/version pointers.
+- [ ] Edit Title modal open/close behavior works (Cancel, backdrop click, `Esc`, submit loading state).
+- [ ] Audit log section loads recent actions and action filter/pagination works.
 - [ ] Metadata fields (size/pages/uploader/time) appear correctly in admin list.
 - [ ] Viewer opens valid books and shows an inline error for invalid book id.
 - [ ] Flip navigation works with buttons and keyboard shortcuts.
@@ -59,3 +67,5 @@
 - [ ] Layout remains usable on desktop and mobile viewport sizes.
 - [ ] Mobile controls remain tappable and visible around safe-area/notch areas.
 - [ ] On touch devices while zoomed, drag-to-pan does not trigger unwanted page/bounce scrolling.
+- [ ] CSRF protection blocks POST actions when token is missing/invalid.
+- [ ] `cleanup_orphan_uploads.php` dry-run and `--delete` mode behave as expected.

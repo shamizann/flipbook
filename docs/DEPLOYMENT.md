@@ -18,6 +18,7 @@ Production deployment checklist for the flipbook project.
 2. If upgrading an existing installation, run migrations in order:
    - `migrations/2026-02-24-book-versions.sql`
    - `migrations/2026-02-24-soft-delete-metadata.sql`
+   - `migrations/2026-02-25-admin-audit-trail.sql`
 3. Run each migration once per environment.
 4. Create at least one admin user in `users`:
    - generate hash using `password_hash(...)`
@@ -63,9 +64,12 @@ No framework router is required; direct file mapping is used:
 - `/admin.php`
 - `/upload.php`
 - `/replace_book.php`
+- `/update_book.php`
 - `/list_books.php`
+- `/list_audit_logs.php`
 - `/delete_book.php`
 - `/restore_book.php`
+- `/hard_delete_book.php`
 - `/list_book_versions.php`
 - `/get_book.php`
 - `/index.html`
@@ -74,9 +78,8 @@ Make sure static assets under `assets/` are publicly readable.
 
 ## 6) Security Hardening (Recommended)
 
-Current app provides session auth + upload validation, but for production add:
+Current app provides session auth + upload validation + CSRF for login/admin POST actions, but for production add:
 
-- CSRF protection for admin POST actions (`upload.php`, `replace_book.php`, `delete_book.php`, `restore_book.php`, login form)
 - Login throttling/rate limiting
 - Secure session cookie settings:
   - `session.cookie_httponly=1`
@@ -101,6 +104,11 @@ Suggested schedule:
 - Daily DB backup
 - Daily/weekly uploads backup (depending on upload volume)
 
+Optional storage maintenance:
+
+- Run orphan cleanup in dry-run mode first: `php cleanup_orphan_uploads.php`
+- Run delete mode only after review: `php cleanup_orphan_uploads.php --delete`
+
 ## 8) Smoke Test After Deploy
 
 1. Login with admin user.
@@ -112,10 +120,13 @@ Suggested schedule:
 7. Move a book to trash, confirm it is hidden from active list, then restore it.
 8. Open viewer link `index.html?id=<book_id>`.
 9. Test flip, zoom, jump, fullscreen, and download.
-10. Test mobile viewport (`<=768px`) to confirm control bar remains usable and does not overlap critical content.
-11. On iOS/mobile, confirm controls remain accessible near safe-area/notch/home-indicator regions.
-12. While zoomed on touch device, verify drag-to-pan works without unwanted browser bounce/scroll.
-13. Reopen same book and verify last page restore.
+10. Move a trashed book through hard-delete flow and verify second confirmation is required.
+11. Update one book title via `Edit Title` modal (without file replacement) and verify list/search reflects new title.
+12. Verify audit records exist for `login`, `upload`, `replace`, `update_title`, `trash`, `restore`, and `hard_delete`.
+13. Test mobile viewport (`<=768px`) to confirm control bar remains usable and does not overlap critical content.
+14. On iOS/mobile, confirm controls remain accessible near safe-area/notch/home-indicator regions.
+15. While zoomed on touch device, verify drag-to-pan works without unwanted browser bounce/scroll.
+16. Reopen same book and verify last page restore.
 
 ## 9) Troubleshooting
 
@@ -144,3 +155,8 @@ Suggested schedule:
 
 - Restore the book from admin (`restore_book.php` action).
 - Or switch admin filter to `Trash` and restore from list.
+
+### Mobile behavior differs by browser
+
+- Landscape mode on small phones reduces usable reading area; validate portrait fallback in QA.
+- Fullscreen behavior varies by browser/platform and may be limited in iOS Safari contexts.
