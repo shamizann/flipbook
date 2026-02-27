@@ -194,7 +194,7 @@ Then open `http://localhost:8000/login.php`.
 - Upload validation includes:
   - extension check (`.pdf`)
   - MIME check (`application/pdf`)
-  - max size (`25 MB`)
+  - max size (`50 MB`)
   - random stored file name
 - Versioning model:
   - Each replacement creates a new row in `book_versions`.

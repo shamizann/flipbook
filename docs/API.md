@@ -151,7 +151,7 @@ Request:
 Validation:
 
 - File must be uploaded via HTTP upload mechanism
-- Max size: `25 MB`
+- Max size: `50 MB`
 - Extension: `.pdf`
 - MIME: `application/pdf`
 
@@ -353,7 +353,8 @@ Success response:
     "id": 12,
     "title": "sample_document",
     "fileUrl": "uploads/53dbe9f2257f45f5a1d6f6f36c4f920d.pdf",
-    "fileName": "Sample Document.pdf"
+    "fileName": "Sample Document.pdf",
+    "fileSizeBytes": 47321652
   }
 }
 ```

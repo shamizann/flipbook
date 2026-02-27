@@ -20,12 +20,17 @@ document.addEventListener('DOMContentLoaded', function () {
     const fullscreenBtn = document.getElementById('fullscreen-btn');
     const downloadBtn = document.getElementById('download-btn');
 
-    const renderScale = 1.5;
+    const defaultRenderScale = 1.5;
+    const largeFileRenderScale = 1.2;
+    const slowNetworkRenderScale = 1.15;
+    const largeFileThresholdBytes = 30 * 1024 * 1024; // 30 MB
+    const rangeChunkSizeBytes = 512 * 1024; // 512 KB
 
     let pageFlip = null;
     let pdfDoc = null;
     let pageCount = 0;
     let currentBookId = null;
+    let activeRenderScale = defaultRenderScale;
 
     let currentZoom = 1;
     let isPanning = false;
@@ -68,6 +73,60 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function closeMenu() {
         menuDropdown.classList.remove('active');
+    }
+
+    function isSlowNetwork() {
+        const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        if (!connection) {
+            return false;
+        }
+
+        if (connection.saveData) {
+            return true;
+        }
+
+        const networkType = connection.effectiveType || '';
+        return networkType === 'slow-2g' || networkType === '2g' || networkType === '3g';
+    }
+
+    function resolveRenderScale(bookSizeBytes) {
+        let scale = defaultRenderScale;
+        if (Number.isInteger(bookSizeBytes) && bookSizeBytes >= largeFileThresholdBytes) {
+            scale = largeFileRenderScale;
+        }
+
+        if (isSlowNetwork()) {
+            scale = Math.min(scale, slowNetworkRenderScale);
+        }
+
+        return scale;
+    }
+
+    function formatBytesAsMb(value) {
+        return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    function updatePdfLoadingProgress(loadedBytes, totalBytes) {
+        if (!Number.isFinite(loadedBytes) || loadedBytes <= 0) {
+            return;
+        }
+
+        if (Number.isFinite(totalBytes) && totalBytes > 0) {
+            const percentage = Math.min(100, Math.round((loadedBytes / totalBytes) * 100));
+            showLoader(true, `Loading PDF... ${percentage}% (${formatBytesAsMb(loadedBytes)} / ${formatBytesAsMb(totalBytes)})`);
+            return;
+        }
+
+        showLoader(true, `Loading PDF... ${formatBytesAsMb(loadedBytes)}`);
+    }
+
+    function buildPdfLoadingOptions(fileUrl) {
+        return {
+            url: fileUrl,
+            disableAutoFetch: true,
+            disableStream: false,
+            rangeChunkSize: rangeChunkSizeBytes,
+        };
     }
 
     function applyZoom() {
@@ -193,7 +252,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const renderPromise = pdfDoc.getPage(pageIndex + 1)
             .then(function (page) {
-                const viewport = page.getViewport({ scale: renderScale });
+                const viewport = page.getViewport({ scale: activeRenderScale });
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
 
@@ -214,18 +273,25 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function renderNearbyPages(centerIndex, waitForCompletion) {
-        const candidates = [centerIndex - 2, centerIndex - 1, centerIndex, centerIndex + 1, centerIndex + 2];
+        const candidates = [centerIndex, centerIndex - 1, centerIndex + 1, centerIndex - 2, centerIndex + 2];
         const valid = candidates.filter(function (index, position, arr) {
             return index >= 0 && index < pageCount && arr.indexOf(index) === position;
         });
 
-        const tasks = valid.map(function (index) {
-            return renderPage(index);
-        });
-
         if (waitForCompletion) {
-            await Promise.all(tasks);
+            for (const index of valid) {
+                await renderPage(index);
+            }
+            return;
         }
+
+        valid.forEach(function (index, queuePosition) {
+            window.setTimeout(function () {
+                renderPage(index).catch(function (error) {
+                    console.error(error);
+                });
+            }, queuePosition * 60);
+        });
     }
 
     function goToPage(index) {
@@ -274,14 +340,24 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             const fileUrl = payload.book.fileUrl;
+            const parsedFileSize = Number.parseInt(payload.book.fileSizeBytes, 10);
+            const fileSizeBytes = Number.isInteger(parsedFileSize) ? parsedFileSize : null;
             currentBookId = payload.book.id;
+            activeRenderScale = resolveRenderScale(fileSizeBytes);
 
             downloadBtn.href = fileUrl;
             if (payload.book.fileName) {
                 downloadBtn.setAttribute('download', payload.book.fileName);
             }
 
-            const loadingTask = pdfjsLib.getDocument(fileUrl);
+            const loadingTask = pdfjsLib.getDocument(buildPdfLoadingOptions(fileUrl));
+            loadingTask.onProgress = function (progressData) {
+                if (!progressData) {
+                    return;
+                }
+
+                updatePdfLoadingProgress(progressData.loaded, progressData.total);
+            };
             pdfDoc = await loadingTask.promise;
             pageCount = pdfDoc.numPages;
 
@@ -301,8 +377,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
             updatePageIndicator(initialPage);
             persistLastPage(initialPage);
-            await renderNearbyPages(initialPage, true);
+            showLoader(true, 'Rendering first page...');
+            await renderPage(initialPage);
             showLoader(false);
+            renderNearbyPages(initialPage, false).catch(function (error) {
+                console.error(error);
+            });
         } catch (error) {
             console.error(error);
             showLoader(false);
