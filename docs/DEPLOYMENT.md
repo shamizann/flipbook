@@ -124,7 +124,7 @@ Suggested schedule:
 ### Upload fails with validation message
 
 - Check file type is real PDF (`application/pdf`).
-- Check file size <= 25MB.
+- Check file size <= 50MB.
 - Verify `uploads/` write permission.
 
 ### Reader says "No valid book id was provided."

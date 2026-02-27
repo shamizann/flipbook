@@ -10,7 +10,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 }
 
 $response = ['success' => false, 'message' => ''];
-$maxUploadBytes = 25 * 1024 * 1024; // 25 MB
+$maxUploadBytes = 50 * 1024 * 1024; // 50 MB
 $adminUserId = isset($_SESSION['admin_user_id']) ? (int) $_SESSION['admin_user_id'] : null;
 
 function getPdfPageCount(string $filePath): ?int
@@ -63,7 +63,7 @@ $fileSize = (int) $uploadedFile['size'];
 
 if ($fileSize <= 0 || $fileSize > $maxUploadBytes) {
     http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'Invalid file size. Max upload is 25 MB.']);
+    echo json_encode(['success' => false, 'message' => 'Invalid file size. Max upload is 50 MB.']);
     exit;
 }
 
