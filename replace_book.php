@@ -1,5 +1,7 @@
 <?php
 require 'db.php';
+require_once 'csrf.php';
+require_once 'audit.php';
 session_start();
 
 header('Content-Type: application/json');
@@ -34,6 +36,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'message' => 'Method not allowed.']);
     exit;
 }
+
+requireCsrfTokenForJsonPost();
 
 $bookId = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
 if (!$bookId || $bookId < 1) {
@@ -150,6 +154,13 @@ try {
     $updateBookStmt->execute([$originalFileName, $targetPath, $fileSizeBytes, $pageCount, $bookId]);
 
     $pdo->commit();
+    writeAdminAuditLog($pdo, 'replace', $adminUserId, (int) $bookId, [
+        'file_name' => $originalFileName,
+        'stored_path' => $targetPath,
+        'version' => $nextVersion,
+        'file_size_bytes' => $fileSizeBytes,
+        'page_count' => $pageCount,
+    ]);
 
     $response['success'] = true;
     $response['message'] = 'PDF replaced successfully.';

@@ -1,5 +1,7 @@
 <?php
 require 'db.php';
+require_once 'csrf.php';
+require_once 'audit.php';
 session_start();
 
 header('Content-Type: application/json');
@@ -14,6 +16,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'message' => 'Method not allowed.']);
     exit;
 }
+
+requireCsrfTokenForJsonPost();
 
 $bookId = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
 if (!$bookId || $bookId < 1) {
@@ -44,6 +48,11 @@ try {
         echo json_encode(['success' => false, 'message' => 'Failed to restore book.']);
         exit;
     }
+
+    $adminUserId = isset($_SESSION['admin_user_id']) ? (int) $_SESSION['admin_user_id'] : null;
+    writeAdminAuditLog($pdo, 'restore', $adminUserId, (int) $bookId, [
+        'title' => $book['title'] ?? null,
+    ]);
 
     echo json_encode(['success' => true, 'message' => 'Book restored from trash.']);
 } catch (PDOException $e) {

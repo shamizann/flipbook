@@ -6,7 +6,9 @@ This document describes the server endpoints used by the flipbook app.
 
 - Content type: JSON for API endpoints unless stated otherwise.
 - Auth model: PHP session (`$_SESSION['admin_logged_in']`).
+- CSRF model: POST actions require `csrf_token` from active session.
 - Base URL examples assume: `http://localhost/flipbook`.
+- CSRF failures return HTTP `419` with `{"success":false,"message":"Invalid CSRF token."}` for JSON endpoints.
 
 ## Authentication
 
@@ -20,6 +22,7 @@ Request:
 - Fields:
   - `username` (string)
   - `password` (string)
+  - `csrf_token` (string, required)
 
 Behavior:
 
@@ -32,6 +35,7 @@ HTML admin dashboard. Requires authenticated session.
 
 - If not authenticated: redirects to `/login.php`.
 - `?logout=true` destroys session and redirects to `/login.php`.
+- Exposes CSRF token via `<meta name="csrf-token">` for frontend POST requests.
 
 ## Books
 
@@ -86,6 +90,51 @@ Success response:
 }
 ```
 
+### `GET /list_audit_logs.php`
+
+Returns admin audit trail entries for dashboard review.
+
+Auth required: Yes
+
+Query params:
+
+- `page` (integer, default `1`)
+- `per_page` (integer, default `10`, max `100`)
+- `action` (string, optional exact action filter; e.g. `login`, `upload`, `replace`, `update_title`, `trash`, `restore`, `hard_delete`)
+
+Success response:
+
+```json
+{
+  "success": true,
+  "logs": [
+    {
+      "id": 101,
+      "admin_user_id": 1,
+      "admin_username": "admin",
+      "action": "replace",
+      "book_id": 12,
+      "book_title": "sample_document",
+      "details_json": "{\"version\":4}",
+      "ip_address": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 ...",
+      "created_at": "2026-02-25 10:30:00"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "perPage": 10,
+    "total": 55,
+    "totalPages": 6,
+    "hasPrev": false,
+    "hasNext": true
+  },
+  "filters": {
+    "action": ""
+  }
+}
+```
+
 ### `POST /upload.php`
 
 Uploads a PDF and creates a `books` record with initial version `v1`.
@@ -97,6 +146,7 @@ Request:
 - Content type: `multipart/form-data`
 - Field:
   - `pdf_file` (file)
+  - `csrf_token` (string, required)
 
 Validation:
 
@@ -130,6 +180,7 @@ Request:
 - Fields:
   - `id` (integer, required)
   - `pdf_file` (file, required)
+  - `csrf_token` (string, required)
 
 Behavior:
 
@@ -152,6 +203,31 @@ Success response:
 }
 ```
 
+### `POST /update_book.php`
+
+Updates book metadata (currently title only) without replacing the PDF file.
+
+Auth required: Yes
+
+Request:
+
+- Content type: `multipart/form-data` or `application/x-www-form-urlencoded`
+- Fields:
+  - `id` (integer, required)
+  - `title` (string, required, max 255 chars)
+  - `csrf_token` (string, required)
+
+Success response:
+
+```json
+{
+  "success": true,
+  "message": "Title updated.",
+  "bookId": 12,
+  "title": "Updated Catalog 2026"
+}
+```
+
 ### `POST /delete_book.php`
 
 Moves a book to trash (soft delete).
@@ -163,6 +239,7 @@ Request:
 - Content type: `multipart/form-data` or `application/x-www-form-urlencoded`
 - Fields:
   - `id` (integer, required)
+  - `csrf_token` (string, required)
 
 Success response:
 
@@ -184,6 +261,7 @@ Request:
 - Content type: `multipart/form-data` or `application/x-www-form-urlencoded`
 - Fields:
   - `id` (integer, required)
+  - `csrf_token` (string, required)
 
 Success response:
 
@@ -191,6 +269,32 @@ Success response:
 {
   "success": true,
   "message": "Book restored from trash."
+}
+```
+
+### `POST /hard_delete_book.php`
+
+Permanently deletes a trashed book and its version history, then attempts to remove unreferenced files from `uploads/`.
+
+Auth required: Yes
+
+Request:
+
+- Content type: `multipart/form-data` or `application/x-www-form-urlencoded`
+- Fields:
+  - `id` (integer, required)
+  - `confirm_phrase` (must equal `DELETE`)
+  - `csrf_token` (string, required)
+
+Success response:
+
+```json
+{
+  "success": true,
+  "message": "Book permanently deleted.",
+  "deletedFilesCount": 2,
+  "missingFilesCount": 0,
+  "skippedFilesCount": 0
 }
 ```
 

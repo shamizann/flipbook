@@ -1,5 +1,7 @@
 <?php
 require 'db.php';
+require_once 'csrf.php';
+require_once 'audit.php';
 session_start();
 
 header('Content-Type: application/json');
@@ -14,6 +16,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'message' => 'Method not allowed.']);
     exit;
 }
+
+requireCsrfTokenForJsonPost();
 
 $bookId = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
 if (!$bookId || $bookId < 1) {
@@ -51,6 +55,9 @@ try {
         'success' => true,
         'message' => 'Book moved to trash.',
     ];
+    writeAdminAuditLog($pdo, 'trash', $adminUserId, (int) $bookId, [
+        'title' => $book['title'] ?? null,
+    ]);
 
     echo json_encode($response);
 } catch (PDOException $e) {

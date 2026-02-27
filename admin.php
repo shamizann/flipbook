@@ -1,9 +1,12 @@
 <?php
+require_once 'csrf.php';
 session_start();
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: login.php');
     exit;
 }
+
+$csrfToken = getCsrfToken();
 
 if (isset($_GET['logout'])) {
     session_destroy();
@@ -17,6 +20,7 @@ if (isset($_GET['logout'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
     <title>Flipbook Admin</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <style>
@@ -71,6 +75,22 @@ if (isset($_GET['logout'])) {
 
         .list-controls input,
         .list-controls select {
+            padding: 8px 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            background: #fff;
+        }
+
+        .audit-controls {
+            display: grid;
+            grid-template-columns: minmax(180px, 1fr) auto auto;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 12px;
+            margin-top: 10px;
+        }
+
+        .audit-controls select {
             padding: 8px 10px;
             border: 1px solid #ccc;
             border-radius: 6px;
@@ -160,6 +180,15 @@ if (isset($_GET['logout'])) {
             text-decoration: none;
         }
 
+        .btn-edit {
+            background: #0d6efd;
+            color: #fff;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
         .btn-replace {
             background: #f0ad4e;
             color: #1f1f1f;
@@ -187,6 +216,15 @@ if (isset($_GET['logout'])) {
             cursor: pointer;
         }
 
+        .btn-hard-delete {
+            background: #7a1a1a;
+            color: #fff;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
         .btn-logout {
             background: #6c757d;
             color: white;
@@ -201,8 +239,10 @@ if (isset($_GET['logout'])) {
         }
 
         .btn-delete:disabled,
+        .btn-edit:disabled,
         .btn-replace:disabled,
         .btn-restore:disabled,
+        .btn-hard-delete:disabled,
         .btn:disabled {
             opacity: 0.7;
             cursor: not-allowed;
@@ -338,8 +378,144 @@ if (isset($_GET['logout'])) {
             cursor: not-allowed;
         }
 
+        .audit-section {
+            margin-top: 30px;
+        }
+
+        .audit-table-wrap {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: auto;
+            background: #fff;
+        }
+
+        .audit-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 760px;
+            font-size: 13px;
+        }
+
+        .audit-table th,
+        .audit-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #ececec;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .audit-table th {
+            position: sticky;
+            top: 0;
+            background: #f8f9fa;
+            z-index: 1;
+        }
+
+        .audit-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .audit-empty {
+            padding: 14px;
+            color: #666;
+        }
+
+        .audit-action-pill {
+            display: inline-block;
+            border-radius: 999px;
+            background: #495057;
+            color: #fff;
+            padding: 2px 8px;
+            font-size: 11px;
+            letter-spacing: 0.2px;
+        }
+
+        .audit-secondary {
+            color: #666;
+            font-size: 12px;
+            margin-top: 4px;
+            line-height: 1.35;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2200;
+            padding: 16px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-card {
+            width: 100%;
+            max-width: 460px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 18px 42px rgba(0, 0, 0, 0.24);
+            padding: 18px;
+        }
+
+        .modal-title {
+            margin: 0;
+            font-size: 20px;
+            color: #1f2937;
+        }
+
+        .modal-subtitle {
+            margin-top: 8px;
+            margin-bottom: 14px;
+            color: #4b5563;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .modal-form label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .modal-form input[type="text"] {
+            width: 100%;
+            border: 1px solid #c8ced6;
+            border-radius: 8px;
+            padding: 9px 11px;
+            font-size: 14px;
+            color: #1f2937;
+        }
+
+        .modal-form input[type="text"]:focus {
+            outline: none;
+            border-color: #0d6efd;
+            box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.12);
+        }
+
+        .modal-error {
+            margin-top: 10px;
+            font-size: 13px;
+            color: #b42318;
+            min-height: 18px;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 14px;
+        }
+
         @media (max-width: 900px) {
             .list-controls {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .audit-controls {
                 grid-template-columns: 1fr 1fr;
             }
 
@@ -354,6 +530,10 @@ if (isset($_GET['logout'])) {
 
         @media (max-width: 560px) {
             .list-controls {
+                grid-template-columns: 1fr;
+            }
+
+            .audit-controls {
                 grid-template-columns: 1fr;
             }
         }
@@ -396,10 +576,53 @@ if (isset($_GET['logout'])) {
             <div class="loading">Loading books...</div>
         </div>
         <div id="pagination-controls" class="pagination-controls"></div>
+
+        <div class="audit-section">
+            <h2>Audit Trail</h2>
+            <div class="audit-controls">
+                <select id="audit-action-filter">
+                    <option value="">All actions</option>
+                    <option value="login">login</option>
+                    <option value="upload">upload</option>
+                    <option value="replace">replace</option>
+                    <option value="trash">trash</option>
+                    <option value="restore">restore</option>
+                    <option value="update_title">update_title</option>
+                    <option value="hard_delete">hard_delete</option>
+                    <option value="cleanup_orphan_uploads">cleanup_orphan_uploads</option>
+                </select>
+                <select id="audit-per-page-select">
+                    <option value="10">10 / page</option>
+                    <option value="20">20 / page</option>
+                    <option value="50">50 / page</option>
+                </select>
+                <button id="audit-refresh-btn" class="btn btn-secondary" type="button">Refresh Logs</button>
+            </div>
+            <div id="audit-summary" class="list-summary"></div>
+            <div id="audit-log-list" class="audit-table-wrap">
+                <div class="audit-empty">Loading audit logs...</div>
+            </div>
+            <div id="audit-pagination-controls" class="pagination-controls"></div>
+        </div>
+    </div>
+
+    <div id="edit-title-modal" class="modal-overlay" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="edit-title-heading">
+            <h3 id="edit-title-heading" class="modal-title">Edit Book Title</h3>
+            <p id="edit-title-book-label" class="modal-subtitle"></p>
+            <form id="edit-title-form" class="modal-form">
+                <label for="edit-title-input">Title</label>
+                <input id="edit-title-input" type="text" maxlength="255" required>
+                <div id="edit-title-error" class="modal-error" role="alert"></div>
+                <div class="modal-actions">
+                    <button id="edit-title-cancel" class="btn btn-secondary" type="button">Cancel</button>
+                    <button id="edit-title-save" class="btn btn-primary" type="submit">Save Title</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <script src="assets/js/admin.js"></script>
 </body>
 
 </html>
-
