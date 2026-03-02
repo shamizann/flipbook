@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let pageCount = 0;
     let currentBookId = null;
     let activeRenderScale = defaultRenderScale;
+    let hasFirstPagePainted = false;
 
     let currentZoom = 1;
     let isPanning = false;
@@ -107,13 +108,18 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function updatePdfLoadingProgress(loadedBytes, totalBytes) {
+        if (hasFirstPagePainted) {
+            return;
+        }
+
         if (!Number.isFinite(loadedBytes) || loadedBytes <= 0) {
             return;
         }
 
         if (Number.isFinite(totalBytes) && totalBytes > 0) {
-            const percentage = Math.min(100, Math.round((loadedBytes / totalBytes) * 100));
-            showLoader(true, `Loading PDF... ${percentage}% (${formatBytesAsMb(loadedBytes)} / ${formatBytesAsMb(totalBytes)})`);
+            const safeLoadedBytes = Math.min(loadedBytes, totalBytes);
+            const percentage = Math.min(100, Math.round((safeLoadedBytes / totalBytes) * 100));
+            showLoader(true, `Loading PDF... ${percentage}% (${formatBytesAsMb(safeLoadedBytes)} / ${formatBytesAsMb(totalBytes)})`);
             return;
         }
 
@@ -326,6 +332,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     async function loadBookByResolverQuery(queryString) {
         try {
+            hasFirstPagePainted = false;
             showLoader(true, 'Loading book...');
             clearError();
 
@@ -379,6 +386,7 @@ document.addEventListener('DOMContentLoaded', function () {
             persistLastPage(initialPage);
             showLoader(true, 'Rendering first page...');
             await renderPage(initialPage);
+            hasFirstPagePainted = true;
             showLoader(false);
             renderNearbyPages(initialPage, false).catch(function (error) {
                 console.error(error);
