@@ -138,8 +138,8 @@ Optional storage maintenance:
 ### Upload fails with validation message
 
 - Check file type is real PDF (`application/pdf`).
-- Check file size <= 50MB.
-- Ensure PHP upload limits are high enough (for example: `upload_max_filesize=50M`, `post_max_size=55M`).
+- Check file size <= 100MB.
+- Ensure PHP upload limits are high enough (for example: `upload_max_filesize=100M`, `post_max_size=110M`).
 - Important: apply these limits on the Ubuntu web server runtime (Apache/PHP-FPM), not only on local MacBook development PHP.
 - After updating Ubuntu PHP config, reload the web stack (for example `systemctl reload php8.2-fpm` and your web server service).
 - Verify `uploads/` write permission.

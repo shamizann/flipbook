@@ -151,7 +151,7 @@ Request:
 Validation:
 
 - File must be uploaded via HTTP upload mechanism
-- Max size: `50 MB`
+- Max size: `100 MB`
 - Extension: `.pdf`
 - MIME: `application/pdf`
 
