@@ -229,6 +229,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const canvas = document.createElement('canvas');
             div.appendChild(canvas);
+
+            // Visual placeholder with spinner and page number
+            const placeholder = document.createElement('div');
+            placeholder.className = 'page-placeholder';
+            placeholder.innerHTML = '<div class="page-placeholder-spinner"></div>'
+                + '<span>Page ' + (i + 1) + '</span>';
+            div.appendChild(placeholder);
+
             fragment.appendChild(div);
         }
 
@@ -269,6 +277,11 @@ document.addEventListener('DOMContentLoaded', function () {
             })
             .then(function () {
                 renderedPages.add(pageIndex);
+                // Remove the visual placeholder once rendered
+                var placeholder = pageElement.querySelector('.page-placeholder');
+                if (placeholder) {
+                    placeholder.remove();
+                }
             })
             .finally(function () {
                 renderPromises.delete(pageIndex);
@@ -279,7 +292,13 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function renderNearbyPages(centerIndex, waitForCompletion) {
-        const candidates = [centerIndex, centerIndex - 1, centerIndex + 1, centerIndex - 2, centerIndex + 2];
+        const candidates = [
+            centerIndex,
+            centerIndex - 1, centerIndex + 1,
+            centerIndex - 2, centerIndex + 2,
+            centerIndex - 3, centerIndex + 3,
+            centerIndex + 4,
+        ];
         const valid = candidates.filter(function (index, position, arr) {
             return index >= 0 && index < pageCount && arr.indexOf(index) === position;
         });
@@ -391,11 +410,70 @@ document.addEventListener('DOMContentLoaded', function () {
             renderNearbyPages(initialPage, false).catch(function (error) {
                 console.error(error);
             });
+
+            // Start background progressive preloader after a short delay
+            startBackgroundPreload(initialPage);
         } catch (error) {
             console.error(error);
             showLoader(false);
             showError(error.message || 'Failed to load the selected PDF.');
         }
+    }
+
+    /**
+     * Progressively preload all remaining pages in the background.
+     * Uses requestIdleCallback (with fallback) to avoid blocking the UI.
+     */
+    function startBackgroundPreload(startFrom) {
+        var queue = [];
+
+        // Build a queue ordered by distance from startFrom
+        for (var i = 0; i < pageCount; i++) {
+            queue.push(i);
+        }
+        queue.sort(function (a, b) {
+            return Math.abs(a - startFrom) - Math.abs(b - startFrom);
+        });
+
+        var idx = 0;
+        var BATCH_SIZE = 2;
+        var DELAY_MS = 300;
+
+        function preloadNext() {
+            if (idx >= queue.length) {
+                return;
+            }
+
+            var batch = [];
+            while (batch.length < BATCH_SIZE && idx < queue.length) {
+                var pageIndex = queue[idx];
+                idx++;
+                if (!renderedPages.has(pageIndex) && !renderPromises.has(pageIndex)) {
+                    batch.push(renderPage(pageIndex));
+                }
+            }
+
+            if (batch.length === 0) {
+                // All in this mini-batch already rendered, try next immediately
+                preloadNext();
+                return;
+            }
+
+            Promise.all(batch)
+                .catch(function (err) { console.error(err); })
+                .then(function () {
+                    if (typeof window.requestIdleCallback === 'function') {
+                        window.requestIdleCallback(function () {
+                            window.setTimeout(preloadNext, DELAY_MS);
+                        });
+                    } else {
+                        window.setTimeout(preloadNext, DELAY_MS);
+                    }
+                });
+        }
+
+        // Start after a 2-second grace period so the initial view settles
+        window.setTimeout(preloadNext, 2000);
     }
 
     prevBtn.addEventListener('click', function () {
@@ -609,6 +687,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
     }
 
-    showLoader(false);
-    showError('No valid book id was provided.');
+    // No valid book id — redirect to official portal
+    window.location.href = 'https://kraftangan.gov.my/';
 });

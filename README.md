@@ -20,7 +20,7 @@ The project includes:
 
 - PHP (server endpoints + session auth)
 - MySQL (users and books metadata)
-- PDF.js (`assets/js/pdf.min.js`)
+- PDF.js (`assets/js/pdf.min.js`) — configured for range-request streaming and on-demand page fetching
 - StPageFlip (`assets/js/page-flip.browser.js`)
 - Plain HTML/CSS/JavaScript (no build step)
 
@@ -145,6 +145,18 @@ Then open `http://localhost:8000/login.php`.
 5. Restore books from `Trash` when needed, or `Hard Delete` with second confirmation for permanent removal.
 6. Review recent admin actions in `Audit Trail` section (filter by action and paginate).
 7. Reader resolves `id` via `get_book.php`, then loads the PDF.
+
+## Performance — Large PDF Handling
+
+The viewer is optimized for large PDFs (60 MB+) so visitors don't wait for the entire file:
+
+- **Range-request streaming**: PDF.js is configured with `disableAutoFetch` and `rangeChunkSize` so only needed byte ranges are fetched, not the full file.
+- **Lazy page rendering**: Only the current page and nearby pages are rendered; the rest show a lightweight placeholder (spinner + page number).
+- **Wide preload window**: 4 pages ahead and 3 pages behind the current page are pre-rendered for smooth flipping.
+- **Background progressive preloader**: After the initial view settles (2 s), all remaining pages are rendered in small batches (2 pages every 300 ms) using `requestIdleCallback` to avoid blocking the UI.
+- **Server-side support** (`.htaccess`): `Accept-Ranges: bytes` header on PDFs, gzip compression for text assets, and browser caching (1 week for PDFs/JS/CSS, 1 month for images).
+
+Result: the first page appears in a few seconds regardless of PDF size.
 
 ## Reader Controls
 

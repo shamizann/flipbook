@@ -76,6 +76,24 @@ No framework router is required; direct file mapping is used:
 
 Make sure static assets under `assets/` are publicly readable.
 
+The included `.htaccess` provides:
+- `Accept-Ranges: bytes` for PDF files (required for progressive/lazy PDF loading)
+- Gzip compression for HTML, CSS, JS, and JSON
+- Browser cache expiry rules (1 week for PDFs/JS/CSS, 1 month for images)
+
+If using **Nginx** instead of Apache, add equivalent config:
+
+```nginx
+location ~* \.pdf$ {
+    add_header Accept-Ranges bytes;
+    expires 1w;
+}
+location ~* \.(js|css)$ {
+    gzip on;
+    expires 1w;
+}
+```
+
 ## 6) Security Hardening (Recommended)
 
 Current app provides session auth + upload validation + CSRF for login/admin POST actions, but for production add:
@@ -119,14 +137,15 @@ Optional storage maintenance:
 6. Replace one PDF and verify version history increments while `book_id` link stays the same.
 7. Move a book to trash, confirm it is hidden from active list, then restore it.
 8. Open viewer link `index.html?id=<book_id>`.
-9. Test flip, zoom, jump, fullscreen, and download.
-10. Move a trashed book through hard-delete flow and verify second confirmation is required.
-11. Update one book title via `Edit Title` modal (without file replacement) and verify list/search reflects new title.
-12. Verify audit records exist for `login`, `upload`, `replace`, `update_title`, `trash`, `restore`, and `hard_delete`.
-13. Test mobile viewport (`<=768px`) to confirm control bar remains usable and does not overlap critical content.
-14. On iOS/mobile, confirm controls remain accessible near safe-area/notch/home-indicator regions.
-15. While zoomed on touch device, verify drag-to-pan works without unwanted browser bounce/scroll.
-16. Reopen same book and verify last page restore.
+9. For large PDFs (>30 MB), confirm first page appears within a few seconds and remaining pages load progressively (spinner placeholders visible on unrendered pages).
+10. Test flip, zoom, jump, fullscreen, and download.
+11. Move a trashed book through hard-delete flow and verify second confirmation is required.
+12. Update one book title via `Edit Title` modal (without file replacement) and verify list/search reflects new title.
+13. Verify audit records exist for `login`, `upload`, `replace`, `update_title`, `trash`, `restore`, and `hard_delete`.
+14. Test mobile viewport (`<=768px`) to confirm control bar remains usable and does not overlap critical content.
+15. On iOS/mobile, confirm controls remain accessible near safe-area/notch/home-indicator regions.
+16. While zoomed on touch device, verify drag-to-pan works without unwanted browser bounce/scroll.
+17. Reopen same book and verify last page restore.
 
 ## 9) Troubleshooting
 

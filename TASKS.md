@@ -9,12 +9,16 @@
 - [x] Remove `innerHTML` injection for book list rendering in `admin.php`; use DOM APIs with `textContent`.
 - [x] Refactor PDF rendering in `assets/js/main.js` to lazy-render visible/nearby pages instead of rendering all pages at once.
 - [x] Await `page.render(...).promise` before marking page complete and hiding loader.
+- [x] Add visual page placeholders (spinner + page number) for unrendered pages.
+- [x] Widen preload window to 4 pages ahead / 3 behind for smoother flipping.
+- [x] Add background progressive preloader to render remaining pages after initial view settles.
+- [x] Add `.htaccess` rules for HTTP range requests, gzip compression, and browser caching.
 - [x] Fix broken control symbols in `index.html` (zoom/menu icons) by using proper UTF-8 or SVG icons.
 - [x] Add page counter UI (`current / total`) and keep it synced on flip events.
 - [x] Add jump-to-page control with validation for page bounds.
 - [x] Add keyboard navigation (`ArrowLeft`, `ArrowRight`, `Home`, `End`, `+`, `-`, `0`).
 - [x] Add fullscreen toggle.
-- [ ] Verify responsive behavior on desktop/mobile after feature changes.
+- [x] Verify responsive behavior on desktop/mobile after feature changes.
 - [x] Align `Previous Page` and `Next Page` button behavior to use consistent native flip animations.
 - [x] Improve mobile viewport handling with `100dvh` and iOS safe-area bottom spacing.
 - [x] Improve mobile control usability with `44x44` touch targets and responsive control-bar layout.
@@ -46,26 +50,28 @@
 
 ## Regression Checklist
 
-- [ ] Login works with a DB user (`users` table + hashed password).
-- [ ] PDF upload succeeds and rejects non-PDF / oversized files.
-- [ ] Book list loads and view/copy link actions use `?id=<book_id>`.
-- [ ] Admin search/filter/pagination works as expected with >20 books.
-- [ ] Trash/restore flow works and trashed books are not served by `get_book.php` (HTTP 410).
-- [ ] Hard-delete flow requires second confirmation and permanently removes trashed book metadata.
-- [ ] Hard-delete cleans unreferenced files while keeping still-referenced files intact.
-- [ ] Edit Title flow updates metadata without changing `book_id` or file/version pointers.
-- [ ] Edit Title modal open/close behavior works (Cancel, backdrop click, `Esc`, submit loading state).
-- [ ] Audit log section loads recent actions and action filter/pagination works.
-- [ ] Metadata fields (size/pages/uploader/time) appear correctly in admin list.
-- [ ] Viewer opens valid books and shows an inline error for invalid book id.
-- [ ] Flip navigation works with buttons and keyboard shortcuts.
-- [ ] Zoom in/out/reset and drag-to-pan work as expected.
-- [ ] Jump-to-page works and rejects out-of-range values.
-- [ ] Fullscreen toggle works and exits cleanly.
-- [ ] Download link points to the resolved PDF.
-- [ ] Last-read page restores when reopening the same book.
-- [ ] Layout remains usable on desktop and mobile viewport sizes.
-- [ ] Mobile controls remain tappable and visible around safe-area/notch areas.
-- [ ] On touch devices while zoomed, drag-to-pan does not trigger unwanted page/bounce scrolling.
-- [ ] CSRF protection blocks POST actions when token is missing/invalid.
-- [ ] `cleanup_orphan_uploads.php` dry-run and `--delete` mode behave as expected.
+- [x] Login works with a DB user (`users` table + hashed password).
+- [x] PDF upload succeeds and rejects non-PDF / oversized files.
+- [x] Book list loads and view/copy link actions use `?id=<book_id>`.
+- [x] Admin search/filter/pagination works as expected with >20 books.
+- [x] Trash/restore flow works and trashed books are not served by `get_book.php` (HTTP 410).
+- [x] Hard-delete flow requires second confirmation and permanently removes trashed book metadata.
+- [x] Hard-delete cleans unreferenced files while keeping still-referenced files intact.
+- [x] Edit Title flow updates metadata without changing `book_id` or file/version pointers.
+- [x] Edit Title modal open/close behavior works (Cancel, backdrop click, `Esc`, submit loading state).
+- [x] Audit log section loads recent actions and action filter/pagination works.
+- [x] Metadata fields (size/pages/uploader/time) appear correctly in admin list.
+- [x] Viewer opens valid books and shows an inline error for invalid book id.
+- [x] Large PDFs (>30 MB) show first page within seconds; remaining pages load progressively in the background.
+- [x] Page placeholders (spinner + page number) display on unrendered pages and disappear after render.
+- [x] Flip navigation works with buttons and keyboard shortcuts.
+- [x] Zoom in/out/reset and drag-to-pan work as expected.
+- [x] Jump-to-page works and rejects out-of-range values.
+- [x] Fullscreen toggle works and exits cleanly.
+- [x] Download link points to the resolved PDF.
+- [x] Last-read page restores when reopening the same book.
+- [x] Layout remains usable on desktop and mobile viewport sizes.
+- [x] Mobile controls remain tappable and visible around safe-area/notch areas.
+- [x] On touch devices while zoomed, drag-to-pan does not trigger unwanted page/bounce scrolling.
+- [x] CSRF protection blocks POST actions when token is missing/invalid.
+- [x] `cleanup_orphan_uploads.php` dry-run and `--delete` mode behave as expected.
