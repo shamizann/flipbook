@@ -1,6 +1,10 @@
 <?php
+require_once 'security.php';
+configureSecureSession();
 require 'db.php';
 session_start();
+enforceSessionTimeout();
+sendSecurityHeaders();
 
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Content-Type: application/json');

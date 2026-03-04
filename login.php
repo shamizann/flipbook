@@ -1,8 +1,11 @@
 <?php
+require_once 'security.php';
+configureSecureSession();
 require 'db.php';
 require_once 'csrf.php';
 require_once 'audit.php';
 session_start();
+sendSecurityHeaders();
 
 $error = '';
 $csrfToken = getCsrfToken();
@@ -12,28 +15,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!isValidCsrfToken(is_string($postedToken) ? $postedToken : null)) {
         $error = 'Invalid session token. Please refresh and try again.';
     } else {
-        $username = trim($_POST['username'] ?? '');
-        $password = $_POST['password'] ?? '';
+        $clientIp = getClientIp();
 
-        try {
-            $stmt = $pdo->prepare('SELECT id, password_hash FROM users WHERE username = ? LIMIT 1');
-            $stmt->execute([$username]);
-            $user = $stmt->fetch();
+        // Rate limiting: block after too many failed attempts
+        if (isLoginRateLimited($clientIp)) {
+            $error = 'Too many failed login attempts. Please try again later.';
+        } else {
+            $username = trim($_POST['username'] ?? '');
+            $password = $_POST['password'] ?? '';
 
-            if ($user && password_verify($password, $user['password_hash'])) {
-                session_regenerate_id(true);
-                $adminUserId = (int) $user['id'];
-                $_SESSION['admin_logged_in'] = true;
-                $_SESSION['admin_user_id'] = $adminUserId;
-                writeAdminAuditLog($pdo, 'login', $adminUserId, null, ['username' => $username]);
-                header('Location: admin.php');
-                exit;
+            try {
+                $stmt = $pdo->prepare('SELECT id, password_hash FROM users WHERE username = ? LIMIT 1');
+                $stmt->execute([$username]);
+                $user = $stmt->fetch();
+
+                if ($user && password_verify($password, $user['password_hash'])) {
+                    clearFailedLogins($clientIp);
+                    session_regenerate_id(true);
+                    $adminUserId = (int) $user['id'];
+                    $_SESSION['admin_logged_in'] = true;
+                    $_SESSION['admin_user_id'] = $adminUserId;
+                    $_SESSION['last_activity'] = time();
+                    writeAdminAuditLog($pdo, 'login', $adminUserId, null, ['username' => $username]);
+                    header('Location: admin.php');
+                    exit;
+                }
+
+                recordFailedLogin($clientIp);
+                $error = 'Invalid username or password';
+            } catch (PDOException $e) {
+                $error = 'Login is temporarily unavailable. Please try again later.';
             }
-
-            $error = 'Invalid username or password';
-        } catch (PDOException $e) {
-            $error = 'Login is temporarily unavailable. Please try again later.';
         }
+    }
+
+    // Occasionally clean up stale lockout files
+    if (random_int(1, 50) === 1) {
+        cleanupStaleLockoutFiles();
     }
 }
 ?>

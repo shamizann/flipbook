@@ -1,6 +1,11 @@
 <?php
+require_once 'security.php';
+configureSecureSession();
 require_once 'csrf.php';
 session_start();
+enforceSessionTimeout();
+sendSecurityHeaders();
+
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: login.php');
     exit;
@@ -8,10 +13,18 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 
 $csrfToken = getCsrfToken();
 
-if (isset($_GET['logout'])) {
-    session_destroy();
-    header('Location: login.php');
-    exit;
+// SECURITY: Logout via POST with CSRF token (not GET) to prevent forced-logout attacks
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['logout'])) {
+    if (isValidCsrfToken($_POST['csrf_token'] ?? null)) {
+        $_SESSION = [];
+        if (ini_get('session.use_cookies')) {
+            $params = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+        }
+        session_destroy();
+        header('Location: login.php');
+        exit;
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -230,8 +243,11 @@ if (isset($_GET['logout'])) {
             color: white;
             text-decoration: none;
             padding: 8px 15px;
+            border: none;
             border-radius: 4px;
             white-space: nowrap;
+            cursor: pointer;
+            font-size: 14px;
         }
 
         .btn-logout:hover {
@@ -545,7 +561,11 @@ if (isset($_GET['logout'])) {
     <div class="admin-container">
         <div class="header">
             <h1>Flipbook Library Manager</h1>
-            <a href="?logout=true" class="btn-logout">Logout</a>
+            <form method="POST" style="margin:0;">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
+                <input type="hidden" name="logout" value="1">
+                <button type="submit" class="btn-logout">Logout</button>
+            </form>
         </div>
 
         <div class="upload-section">

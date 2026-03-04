@@ -2,6 +2,8 @@
 require 'db.php';
 
 header('Content-Type: application/json');
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
 
 function isValidStoredPath(string $path): bool
 {
