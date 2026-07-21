@@ -20,12 +20,18 @@ document.addEventListener('DOMContentLoaded', function () {
     const fullscreenBtn = document.getElementById('fullscreen-btn');
     const downloadBtn = document.getElementById('download-btn');
 
-    const renderScale = 1.5;
+    const defaultRenderScale = 1.5;
+    const largeFileRenderScale = 1.2;
+    const slowNetworkRenderScale = 1.15;
+    const largeFileThresholdBytes = 30 * 1024 * 1024; // 30 MB
+    const rangeChunkSizeBytes = 512 * 1024; // 512 KB
 
     let pageFlip = null;
     let pdfDoc = null;
     let pageCount = 0;
     let currentBookId = null;
+    let activeRenderScale = defaultRenderScale;
+    let hasFirstPagePainted = false;
 
     let currentZoom = 1;
     let isPanning = false;
@@ -68,6 +74,65 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function closeMenu() {
         menuDropdown.classList.remove('active');
+    }
+
+    function isSlowNetwork() {
+        const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        if (!connection) {
+            return false;
+        }
+
+        if (connection.saveData) {
+            return true;
+        }
+
+        const networkType = connection.effectiveType || '';
+        return networkType === 'slow-2g' || networkType === '2g' || networkType === '3g';
+    }
+
+    function resolveRenderScale(bookSizeBytes) {
+        let scale = defaultRenderScale;
+        if (Number.isInteger(bookSizeBytes) && bookSizeBytes >= largeFileThresholdBytes) {
+            scale = largeFileRenderScale;
+        }
+
+        if (isSlowNetwork()) {
+            scale = Math.min(scale, slowNetworkRenderScale);
+        }
+
+        return scale;
+    }
+
+    function formatBytesAsMb(value) {
+        return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    function updatePdfLoadingProgress(loadedBytes, totalBytes) {
+        if (hasFirstPagePainted) {
+            return;
+        }
+
+        if (!Number.isFinite(loadedBytes) || loadedBytes <= 0) {
+            return;
+        }
+
+        if (Number.isFinite(totalBytes) && totalBytes > 0) {
+            const safeLoadedBytes = Math.min(loadedBytes, totalBytes);
+            const percentage = Math.min(100, Math.round((safeLoadedBytes / totalBytes) * 100));
+            showLoader(true, `Loading PDF... ${percentage}% (${formatBytesAsMb(safeLoadedBytes)} / ${formatBytesAsMb(totalBytes)})`);
+            return;
+        }
+
+        showLoader(true, `Loading PDF... ${formatBytesAsMb(loadedBytes)}`);
+    }
+
+    function buildPdfLoadingOptions(fileUrl) {
+        return {
+            url: fileUrl,
+            disableAutoFetch: true,
+            disableStream: false,
+            rangeChunkSize: rangeChunkSizeBytes,
+        };
     }
 
     function applyZoom() {
@@ -164,6 +229,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const canvas = document.createElement('canvas');
             div.appendChild(canvas);
+
+            // Visual placeholder with spinner and page number
+            const placeholder = document.createElement('div');
+            placeholder.className = 'page-placeholder';
+            placeholder.innerHTML = '<div class="page-placeholder-spinner"></div>'
+                + '<span>Page ' + (i + 1) + '</span>';
+            div.appendChild(placeholder);
+
             fragment.appendChild(div);
         }
 
@@ -193,7 +266,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const renderPromise = pdfDoc.getPage(pageIndex + 1)
             .then(function (page) {
-                const viewport = page.getViewport({ scale: renderScale });
+                const viewport = page.getViewport({ scale: activeRenderScale });
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
 
@@ -204,6 +277,11 @@ document.addEventListener('DOMContentLoaded', function () {
             })
             .then(function () {
                 renderedPages.add(pageIndex);
+                // Remove the visual placeholder once rendered
+                var placeholder = pageElement.querySelector('.page-placeholder');
+                if (placeholder) {
+                    placeholder.remove();
+                }
             })
             .finally(function () {
                 renderPromises.delete(pageIndex);
@@ -214,18 +292,31 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function renderNearbyPages(centerIndex, waitForCompletion) {
-        const candidates = [centerIndex - 2, centerIndex - 1, centerIndex, centerIndex + 1, centerIndex + 2];
+        const candidates = [
+            centerIndex,
+            centerIndex - 1, centerIndex + 1,
+            centerIndex - 2, centerIndex + 2,
+            centerIndex - 3, centerIndex + 3,
+            centerIndex + 4,
+        ];
         const valid = candidates.filter(function (index, position, arr) {
             return index >= 0 && index < pageCount && arr.indexOf(index) === position;
         });
 
-        const tasks = valid.map(function (index) {
-            return renderPage(index);
-        });
-
         if (waitForCompletion) {
-            await Promise.all(tasks);
+            for (const index of valid) {
+                await renderPage(index);
+            }
+            return;
         }
+
+        valid.forEach(function (index, queuePosition) {
+            window.setTimeout(function () {
+                renderPage(index).catch(function (error) {
+                    console.error(error);
+                });
+            }, queuePosition * 60);
+        });
     }
 
     function goToPage(index) {
@@ -260,6 +351,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     async function loadBookByResolverQuery(queryString) {
         try {
+            hasFirstPagePainted = false;
             showLoader(true, 'Loading book...');
             clearError();
 
@@ -274,14 +366,24 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             const fileUrl = payload.book.fileUrl;
+            const parsedFileSize = Number.parseInt(payload.book.fileSizeBytes, 10);
+            const fileSizeBytes = Number.isInteger(parsedFileSize) ? parsedFileSize : null;
             currentBookId = payload.book.id;
+            activeRenderScale = resolveRenderScale(fileSizeBytes);
 
             downloadBtn.href = fileUrl;
             if (payload.book.fileName) {
                 downloadBtn.setAttribute('download', payload.book.fileName);
             }
 
-            const loadingTask = pdfjsLib.getDocument(fileUrl);
+            const loadingTask = pdfjsLib.getDocument(buildPdfLoadingOptions(fileUrl));
+            loadingTask.onProgress = function (progressData) {
+                if (!progressData) {
+                    return;
+                }
+
+                updatePdfLoadingProgress(progressData.loaded, progressData.total);
+            };
             pdfDoc = await loadingTask.promise;
             pageCount = pdfDoc.numPages;
 
@@ -301,13 +403,77 @@ document.addEventListener('DOMContentLoaded', function () {
 
             updatePageIndicator(initialPage);
             persistLastPage(initialPage);
-            await renderNearbyPages(initialPage, true);
+            showLoader(true, 'Rendering first page...');
+            await renderPage(initialPage);
+            hasFirstPagePainted = true;
             showLoader(false);
+            renderNearbyPages(initialPage, false).catch(function (error) {
+                console.error(error);
+            });
+
+            // Start background progressive preloader after a short delay
+            startBackgroundPreload(initialPage);
         } catch (error) {
             console.error(error);
             showLoader(false);
             showError(error.message || 'Failed to load the selected PDF.');
         }
+    }
+
+    /**
+     * Progressively preload all remaining pages in the background.
+     * Uses requestIdleCallback (with fallback) to avoid blocking the UI.
+     */
+    function startBackgroundPreload(startFrom) {
+        var queue = [];
+
+        // Build a queue ordered by distance from startFrom
+        for (var i = 0; i < pageCount; i++) {
+            queue.push(i);
+        }
+        queue.sort(function (a, b) {
+            return Math.abs(a - startFrom) - Math.abs(b - startFrom);
+        });
+
+        var idx = 0;
+        var BATCH_SIZE = 2;
+        var DELAY_MS = 300;
+
+        function preloadNext() {
+            if (idx >= queue.length) {
+                return;
+            }
+
+            var batch = [];
+            while (batch.length < BATCH_SIZE && idx < queue.length) {
+                var pageIndex = queue[idx];
+                idx++;
+                if (!renderedPages.has(pageIndex) && !renderPromises.has(pageIndex)) {
+                    batch.push(renderPage(pageIndex));
+                }
+            }
+
+            if (batch.length === 0) {
+                // All in this mini-batch already rendered, try next immediately
+                preloadNext();
+                return;
+            }
+
+            Promise.all(batch)
+                .catch(function (err) { console.error(err); })
+                .then(function () {
+                    if (typeof window.requestIdleCallback === 'function') {
+                        window.requestIdleCallback(function () {
+                            window.setTimeout(preloadNext, DELAY_MS);
+                        });
+                    } else {
+                        window.setTimeout(preloadNext, DELAY_MS);
+                    }
+                });
+        }
+
+        // Start after a 2-second grace period so the initial view settles
+        window.setTimeout(preloadNext, 2000);
     }
 
     prevBtn.addEventListener('click', function () {
@@ -521,6 +687,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
     }
 
-    showLoader(false);
-    showError('No valid book id was provided.');
+    // No valid book id — redirect to official portal
+    window.location.href = 'https://kraftangan.gov.my/';
 });

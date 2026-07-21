@@ -3,6 +3,9 @@
 function getCsrfToken(): string
 {
     if (session_status() !== PHP_SESSION_ACTIVE) {
+        if (function_exists('configureSecureSession')) {
+            configureSecureSession();
+        }
         session_start();
     }
 

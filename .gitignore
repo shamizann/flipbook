@@ -11,3 +11,6 @@ Thumbs.db
 
 # Temporary local test artifacts
 tmp_session/
+
+# Security: login rate-limit data
+tmp/

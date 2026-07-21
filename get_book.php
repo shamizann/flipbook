@@ -2,6 +2,8 @@
 require 'db.php';
 
 header('Content-Type: application/json');
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
 
 function isValidStoredPath(string $path): bool
 {
@@ -23,12 +25,16 @@ function resolveBook(array $book): ?array
 
     $segments = explode('/', str_replace('\\', '/', $book['file_path']));
     $encodedPath = implode('/', array_map('rawurlencode', $segments));
+    $fileSizeBytes = isset($book['file_size_bytes']) && $book['file_size_bytes'] !== null
+        ? (int) $book['file_size_bytes']
+        : null;
 
     return [
         'id' => (int) $book['id'],
         'title' => $book['title'],
         'fileUrl' => $encodedPath,
         'fileName' => $book['file_name'],
+        'fileSizeBytes' => $fileSizeBytes,
     ];
 }
 
@@ -37,7 +43,7 @@ try {
     $bookId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 
     if ($bookId && $bookId > 0) {
-        $stmt = $pdo->prepare('SELECT id, title, file_name, file_path, deleted_at FROM books WHERE id = ? LIMIT 1');
+        $stmt = $pdo->prepare('SELECT id, title, file_name, file_path, file_size_bytes, deleted_at FROM books WHERE id = ? LIMIT 1');
         $stmt->execute([$bookId]);
         $book = $stmt->fetch();
 
@@ -62,7 +68,7 @@ try {
             exit;
         }
 
-        $stmt = $pdo->prepare('SELECT id, title, file_name, file_path, deleted_at FROM books WHERE file_path = ? LIMIT 1');
+        $stmt = $pdo->prepare('SELECT id, title, file_name, file_path, file_size_bytes, deleted_at FROM books WHERE file_path = ? LIMIT 1');
         $stmt->execute([$legacyPath]);
         $book = $stmt->fetch();
 

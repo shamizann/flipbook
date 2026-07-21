@@ -1,6 +1,10 @@
 <?php
+require_once 'security.php';
+configureSecureSession();
 require 'db.php';
 session_start();
+enforceSessionTimeout();
+sendSecurityHeaders();
 
 header('Content-Type: application/json');
 

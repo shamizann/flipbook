@@ -1,8 +1,12 @@
 <?php
+require_once 'security.php';
+configureSecureSession();
 require 'db.php';
 require_once 'csrf.php';
 require_once 'audit.php';
 session_start();
+enforceSessionTimeout();
+sendSecurityHeaders();
 
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Content-Type: application/json');
@@ -11,7 +15,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 }
 
 $response = ['success' => false, 'message' => ''];
-$maxUploadBytes = 50 * 1024 * 1024; // 50 MB
+$maxUploadBytes = 100 * 1024 * 1024; // 100 MB
 $adminUserId = isset($_SESSION['admin_user_id']) ? (int) $_SESSION['admin_user_id'] : null;
 
 function getPdfPageCount(string $filePath): ?int
@@ -56,7 +60,7 @@ if (isset($_FILES['pdf_file']) && $_FILES['pdf_file']['error'] === UPLOAD_ERR_OK
         $fileSize = (int) $uploadedFile['size'];
 
         if ($fileSize <= 0 || $fileSize > $maxUploadBytes) {
-            $response['message'] = 'Invalid file size. Max upload is 50 MB.';
+            $response['message'] = 'Invalid file size. Max upload is 100 MB.';
             header('Content-Type: application/json');
             echo json_encode($response);
             exit;
