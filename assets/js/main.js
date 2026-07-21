@@ -132,6 +132,9 @@ document.addEventListener('DOMContentLoaded', function () {
             disableAutoFetch: true,
             disableStream: false,
             rangeChunkSize: rangeChunkSizeBytes,
+            // Security: mitigates CVE-2024-4367 (arbitrary JS execution via crafted
+            // PDF fonts) on PDF.js < 4.2.67. Disables the eval-based font path.
+            isEvalSupported: false,
         };
     }
 
