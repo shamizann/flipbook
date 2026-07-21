@@ -1,0 +1,12 @@
+# Normalize line endings to LF in the repo, avoid CRLF churn on Windows/WSL
+* text=auto eol=lf
+
+# Explicit binaries (never touch)
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
